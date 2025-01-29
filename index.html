@@ -82,6 +82,7 @@
       transition: background 0.3s ease, transform 0.1s ease-in-out;
       background: #007BFF;
       color: white;
+      margin-top: 10px;
     }
 
     button:hover { background: #0056b3; }
@@ -131,12 +132,17 @@
       max-width: 400px;
       text-align: center;
       box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+      /* Ensure vertical stacking */
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
 
     #apiKeyInput {
       width: 80%;
       padding: 8px;
       margin-top: 10px;
+      margin-bottom: 20px; /* Added bottom margin for spacing */
       border: 1px solid #ccc;
       border-radius: 5px;
     }
@@ -156,46 +162,6 @@
       border: none;
       border-top: 1px solid #ddd;
     }
-
-    /* Recording Controls Container */
-    #recordControls {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-top: 10px;
-    }
-
-    /* Recording Indicator */
-    #recordingIndicator {
-      display: none;
-      align-items: center;
-      color: red;
-      font-weight: bold;
-    }
-
-    .blinking-dot {
-      height: 12px;
-      width: 12px;
-      background-color: red;
-      border-radius: 50%;
-      display: inline-block;
-      margin-right: 8px;
-      animation: blink 1s infinite;
-    }
-
-    @keyframes blink {
-      0% { opacity: 1; }
-      50% { opacity: 0; }
-      100% { opacity: 1; }
-    }
-
-    /* Responsive Adjustments */
-    @media (max-width: 600px) {
-      #recordControls {
-        flex-direction: column;
-        align-items: flex-start;
-      }
-    }
   </style>
 </head>
 <body>
@@ -206,31 +172,20 @@
     <div id="apiKeyModalContent">
       <h2>Enter API Key</h2>
       <input type="password" id="apiKeyInput" placeholder="API Key" />
-      <br/>
+      <!-- Removed <br/> and added margin via CSS -->
       <button id="submitApiKeyBtn">Submit</button>
     </div>
   </div>
   
   <div id="mainContent">
-    <!-- VIDEO PREVIEW & RECORDING -->
+    <!-- VIDEO PREVIEW -->
     <video id="videoPreview" autoplay muted></video>
-    
-    <!-- Recording Controls Container -->
-    <div id="recordControls">
-      <button id="startRecordingBtn" disabled>Start Recording</button>
-      <button id="stopRecordingBtn" disabled>Stop Recording</button>
-      
-      <!-- Recording Indicator -->
-      <div id="recordingIndicator">
-        <span class="blinking-dot"></span> Recording...
-      </div>
-    </div>
     
     <hr/>
 
     <!-- OR SELECT VIDEO FROM FILE SYSTEM -->
-    <label for="videoFile">Select Video:</label>
-    <input type="file" id="videoFile" accept="video/*" disabled />
+    <label for="videoFile">Select or Record Video:</label>
+    <input type="file" id="videoFile" accept="video/*" capture="camera" disabled />
     <hr/>
 
     <!-- UPLOAD ACTION -->
@@ -271,8 +226,6 @@
     const apiKeyInput = document.getElementById('apiKeyInput');
     const submitApiKeyBtn = document.getElementById('submitApiKeyBtn');
 
-    const startRecordingBtn = document.getElementById('startRecordingBtn');
-    const stopRecordingBtn = document.getElementById('stopRecordingBtn');
     const videoPreview = document.getElementById('videoPreview');
     const uploadBtn = document.getElementById('uploadBtn');
     const videoFileInput = document.getElementById('videoFile');
@@ -283,11 +236,7 @@
 
     const logsContent = document.getElementById('logsContent');
 
-    const recordingIndicator = document.getElementById('recordingIndicator');
-
     // State
-    let mediaRecorder;
-    let recordedChunks = [];
     let selectedVideoBlob = null; // Will hold the chosen or recorded video
 
     /**
@@ -317,8 +266,7 @@
      * Initialize the Application After API Key is Set
      */
     function initializeApp() {
-      // Enable buttons now that API_KEY is set
-      startRecordingBtn.disabled = false;
+      // Enable file input and upload button
       videoFileInput.disabled = false;
       uploadBtn.disabled = true; // Will be enabled when a video is selected or recorded
       uploadMessage.textContent = 'API Key set. You can now record or select a video to upload.';
@@ -326,75 +274,7 @@
     }
 
     /**
-     * 1) ALLOW CAMERA PREVIEW & RECORD
-     */
-    async function startCameraRecording() {
-      uploadMessage.textContent = 'Accessing camera...';
-      logToAPI('Requesting access to camera and microphone.');
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        videoPreview.srcObject = stream;
-
-        mediaRecorder = new MediaRecorder(stream);
-        mediaRecorder.ondataavailable = (e) => {
-          if (e.data.size > 0) {
-            recordedChunks.push(e.data);
-            logToAPI('Recorded chunk received.');
-          }
-        };
-        mediaRecorder.onstop = () => {
-          // Stop all tracks to release the camera
-          stream.getTracks().forEach(track => track.stop());
-
-          selectedVideoBlob = new Blob(recordedChunks, { type: 'video/mp4' });
-          recordedChunks = [];
-          uploadMessage.textContent = 'Recording stopped. Ready to upload.';
-          logToAPI('Recording stopped. Video blob is ready.');
-
-          // Set video preview to the recorded video
-          const recordedVideoURL = URL.createObjectURL(selectedVideoBlob);
-          videoPreview.srcObject = null;
-          videoPreview.src = recordedVideoURL;
-          videoPreview.controls = true;
-          videoPreview.play();
-
-          // Hide the recording indicator
-          recordingIndicator.style.display = 'none';
-
-          // Enable the upload button
-          uploadBtn.disabled = !selectedVideoBlob;
-        };
-        
-        mediaRecorder.start();
-        uploadMessage.textContent = 'Recording...';
-        logToAPI('MediaRecorder started.');
-
-        // Show the recording indicator
-        recordingIndicator.style.display = 'flex';
-      } catch (err) {
-        console.error('Could not start camera', err);
-        uploadMessage.textContent = `Error starting camera: ${err.message}`;
-        logToAPI(`Error accessing camera: ${err.message}`);
-      }
-    }
-
-    startRecordingBtn.onclick = () => {
-      startRecordingBtn.disabled = true;
-      stopRecordingBtn.disabled = false;
-      startCameraRecording();
-    };
-
-    stopRecordingBtn.onclick = () => {
-      stopRecordingBtn.disabled = true;
-      startRecordingBtn.disabled = false;
-      if (mediaRecorder && mediaRecorder.state === 'recording') {
-        mediaRecorder.stop();
-        logToAPI('MediaRecorder stopped by user.');
-      }
-    };
-
-    /**
-     * 2) OR SELECT VIDEO FROM FILE SYSTEM
+     * Handle Video Selection or Recording
      */
     videoFileInput.onchange = () => {
       if (videoFileInput.files && videoFileInput.files.length > 0) {
@@ -404,7 +284,7 @@
         downloadMessage.textContent = 'Waiting...';
         logToAPI(`Video file selected: ${selectedVideoBlob.name} (${selectedVideoBlob.size} bytes)`);
 
-        // Display the selected video
+        // Display the selected or recorded video
         const videoURL = URL.createObjectURL(selectedVideoBlob);
         videoPreview.srcObject = null;
         videoPreview.src = videoURL;
@@ -417,7 +297,7 @@
     };
 
     /**
-     * 3) UPLOAD VIDEO FLOW:
+     * UPLOAD VIDEO FLOW:
      *    - GET upload endpoint => returns { guid, version, presigned_url }
      *      (Add the required x-api-version and x-api-key headers)
      *    - PUT video to that presigned_url
@@ -587,11 +467,11 @@
         const finalJson = await finalRes.json();
         logToAPI(`Final JSON received: ${JSON.stringify(finalJson)}`);
 
-        downloadMessage.textContent = `Final JSON:\n${JSON.stringify(finalJson, null, 2)}`;
+        // downloadMessage.textContent = `Final JSON:\n${JSON.stringify(finalJson, null, 2)}`;
 
         // 4.2) Display the fields you need (e.g., right_prediction, left_prediction, etc.)
         const { right_prediction, right_confidence, left_prediction, left_confidence } = finalJson;
-        downloadMessage.textContent += `\n\n** Results **\nRight: P=${right_prediction}, C=${right_confidence}\nLeft:  P=${left_prediction}, C=${left_confidence}`;
+        downloadMessage.textContent += `\n\nResults \nRight: HAL=${right_prediction}, Confidence=${right_confidence}\nLeft:  HAL=${left_prediction}, Confidence=${left_confidence}`;
         logToAPI('Displayed final results to the user.');
       } catch (error) {
         downloadMessage.textContent = `Final fetch error: ${error.message}`;
