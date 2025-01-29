@@ -2,46 +2,199 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>HAL Web Demo</title>
   <style>
-    body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 1em; }
-    #videoPreview { width: 100%; max-height: 300px; background: #333; }
-    .panel { 
-      border: 1px solid #ccc; 
-      padding: 10px; 
-      margin-top: 1em; 
-      border-radius: 5px; 
+    /* Reset and Box Sizing */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    /* Body Styling */
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
+      color: #333;
+      max-width: 900px;
+      margin: 20px auto;
+      padding: 1em;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* Header */
+    h1 {
+      margin-bottom: 1rem;
+      color: #007BFF;
+    }
+
+    /* Main Content Container */
+    #mainContent {
+      width: 100%;
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Video Preview */
+    video {
+      width: 100%;
+      max-height: 300px;
+      border-radius: 8px;
+      background: #333;
+      margin-bottom: 10px;
+      object-fit: cover;
+    }
+
+    /* Panel Styling */
+    .panel {
+      border: 1px solid #ddd;
+      padding: 15px;
+      margin-top: 1em;
+      border-radius: 8px;
       background-color: #f9f9f9;
     }
-    .panel h3 { margin: 0; font-size: 1.1em; }
-    .panel-content { margin-top: 5px; font-size: 0.9em; }
-    button { margin: 0.2em 0; }
+
+    .panel h3 {
+      margin-bottom: 5px;
+      font-size: 1.1em;
+      color: #007BFF;
+    }
+
+    .panel-content {
+      font-size: 0.9em;
+      color: #555;
+      white-space: pre-wrap;
+    }
+
+    /* Buttons */
+    button {
+      padding: 10px 16px;
+      font-size: 1em;
+      font-weight: bold;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background 0.3s ease, transform 0.1s ease-in-out;
+      background: #007BFF;
+      color: white;
+    }
+
+    button:hover { background: #0056b3; }
+    button:disabled { background: #ccc; cursor: not-allowed; }
+    button:active { transform: scale(0.96); }
+
+    /* API Logs Section */
+    #apiLogs {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 8px;
+      background: #e9ecef;
+      font-size: 0.9em;
+      max-height: 300px;
+      overflow-y: auto;
+      width: 100%;
+    }
+
+    #apiLogs h3 {
+      margin-bottom: 10px;
+      color: #007BFF;
+    }
+
+    #logsContent {
+      white-space: pre-wrap;
+    }
+
+    /* API Key Modal */
     #apiKeyModal {
-      display: block; 
+      display: flex;
+      align-items: center;
+      justify-content: center;
       position: fixed;
-      z-index: 1;
+      z-index: 1000;
       left: 0;
       top: 0;
       width: 100%;
       height: 100%;
-      overflow: auto;
       background-color: rgba(0,0,0,0.4);
     }
+
     #apiKeyModalContent {
-      background-color: #fefefe;
-      margin: 15% auto;
+      background-color: white;
       padding: 20px;
-      border: 1px solid #888;
-      width: 80%;
+      border-radius: 10px;
+      width: 90%;
       max-width: 400px;
       text-align: center;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.3);
     }
+
     #apiKeyInput {
       width: 80%;
       padding: 8px;
       margin-top: 10px;
-      margin-bottom: 20px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+
+    /* File Input Label */
+    label[for="videoFile"] {
+      display: block;
+      margin-top: 15px;
+      margin-bottom: 5px;
+      font-weight: bold;
+      color: #007BFF;
+    }
+
+    /* Horizontal Rules */
+    hr {
+      margin: 20px 0;
+      border: none;
+      border-top: 1px solid #ddd;
+    }
+
+    /* Recording Controls Container */
+    #recordControls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    /* Recording Indicator */
+    #recordingIndicator {
+      display: none;
+      align-items: center;
+      color: red;
+      font-weight: bold;
+    }
+
+    .blinking-dot {
+      height: 12px;
+      width: 12px;
+      background-color: red;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 8px;
+      animation: blink 1s infinite;
+    }
+
+    @keyframes blink {
+      0% { opacity: 1; }
+      50% { opacity: 0; }
+      100% { opacity: 1; }
+    }
+
+    /* Responsive Adjustments */
+    @media (max-width: 600px) {
+      #recordControls {
+        flex-direction: column;
+        align-items: flex-start;
+      }
     }
   </style>
 </head>
@@ -58,46 +211,58 @@
     </div>
   </div>
   
-  <!-- VIDEO PREVIEW & RECORDING -->
-  <div>
-    <video id="videoPreview" autoplay muted></video><br/>
-    <button id="startRecordingBtn" disabled>Start Recording</button>
-    <button id="stopRecordingBtn" disabled>Stop Recording</button>
-  </div>
-  <hr/>
-  
-  <!-- OR SELECT VIDEO FROM FILE SYSTEM -->
-  <div>
-    <label for="videoFile">Select Video from Device:</label>
+  <div id="mainContent">
+    <!-- VIDEO PREVIEW & RECORDING -->
+    <video id="videoPreview" autoplay muted></video>
+    
+    <!-- Recording Controls Container -->
+    <div id="recordControls">
+      <button id="startRecordingBtn" disabled>Start Recording</button>
+      <button id="stopRecordingBtn" disabled>Stop Recording</button>
+      
+      <!-- Recording Indicator -->
+      <div id="recordingIndicator">
+        <span class="blinking-dot"></span> Recording...
+      </div>
+    </div>
+    
+    <hr/>
+
+    <!-- OR SELECT VIDEO FROM FILE SYSTEM -->
+    <label for="videoFile">Select Video:</label>
     <input type="file" id="videoFile" accept="video/*" disabled />
+    <hr/>
+
+    <!-- UPLOAD ACTION -->
+    <button id="uploadBtn" disabled>Upload to AWS</button>
+
+    <!-- Panels for Status Updates -->
+    <div id="uploadPanel" class="panel">
+      <h3>📤 Upload Status</h3>
+      <div id="uploadMessage" class="panel-content">Waiting for video...</div>
+    </div>
+    <div id="statusPanel" class="panel">
+      <h3>⏳ Processing Status</h3>
+      <div id="statusMessage" class="panel-content">No updates yet.</div>
+    </div>
+    <div id="downloadPanel" class="panel">
+      <h3>📥 Download Status</h3>
+      <div id="downloadMessage" class="panel-content">Waiting...</div>
+    </div>
   </div>
-  <hr/>
-
-  <!-- UPLOAD ACTION -->
-  <button id="uploadBtn" disabled>Upload to AWS</button>
-
-  <!-- Message Display Sections -->
-  <div id="uploadPanel" class="panel">
-    <h3>📤 Upload Status</h3>
-    <div id="uploadMessage" class="panel-content">Waiting for video...</div>
-  </div>
-
-  <div id="statusPanel" class="panel">
-    <h3>⏳ Processing Status</h3>
-    <div id="statusMessage" class="panel-content">No status updates yet.</div>
-  </div>
-
-  <div id="downloadPanel" class="panel">
-    <h3>📥 Download Status</h3>
-    <div id="downloadMessage" class="panel-content">Waiting for processing to complete...</div>
-  </div>
-
-  <div id="resultsPanel" class="panel" style="display: none;">
-    <h3>✅ **Results**</h3>
-    <div id="resultsMessage" class="panel-content"></div>
+  
+  <!-- API Logs -->
+  <div id="apiLogs">
+    <h3>📡 Live API Calls</h3>
+    <pre id="logsContent">Logs will appear here...</pre>
   </div>
 
   <script>
+    /**
+     * API Configuration
+     * - API_VERSION is constant.
+     * - API_KEY is obtained from user input.
+     */
     const API_VERSION = '0.4.0';
     let API_KEY = null;
 
@@ -115,13 +280,28 @@
     const uploadMessage = document.getElementById('uploadMessage');
     const statusMessage = document.getElementById('statusMessage');
     const downloadMessage = document.getElementById('downloadMessage');
-    const resultsPanel = document.getElementById('resultsPanel');
-    const resultsMessage = document.getElementById('resultsMessage');
 
+    const logsContent = document.getElementById('logsContent');
+
+    const recordingIndicator = document.getElementById('recordingIndicator');
+
+    // State
     let mediaRecorder;
     let recordedChunks = [];
-    let selectedVideoBlob = null;
+    let selectedVideoBlob = null; // Will hold the chosen or recorded video
 
+    /**
+     * Utility Function to Log Messages to API Logs Panel
+     */
+    function logToAPI(message) {
+      const timestamp = new Date().toLocaleTimeString();
+      logsContent.textContent += `[${timestamp}] ${message}\n`;
+      logsContent.scrollTop = logsContent.scrollHeight;
+    }
+
+    /**
+     * Handle API Key Submission
+     */
     submitApiKeyBtn.onclick = () => {
       const enteredKey = apiKeyInput.value.trim();
       if (enteredKey) {
@@ -133,77 +313,290 @@
       }
     };
 
+    /**
+     * Initialize the Application After API Key is Set
+     */
     function initializeApp() {
+      // Enable buttons now that API_KEY is set
       startRecordingBtn.disabled = false;
       videoFileInput.disabled = false;
-      uploadMessage.innerText = 'API Key set. You can now record or select a video to upload.';
+      uploadBtn.disabled = true; // Will be enabled when a video is selected or recorded
+      uploadMessage.textContent = 'API Key set. You can now record or select a video to upload.';
+      logToAPI('API Key has been set.');
     }
 
+    /**
+     * 1) ALLOW CAMERA PREVIEW & RECORD
+     */
+    async function startCameraRecording() {
+      uploadMessage.textContent = 'Accessing camera...';
+      logToAPI('Requesting access to camera and microphone.');
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        videoPreview.srcObject = stream;
+
+        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data.size > 0) {
+            recordedChunks.push(e.data);
+            logToAPI('Recorded chunk received.');
+          }
+        };
+        mediaRecorder.onstop = () => {
+          // Stop all tracks to release the camera
+          stream.getTracks().forEach(track => track.stop());
+
+          selectedVideoBlob = new Blob(recordedChunks, { type: 'video/mp4' });
+          recordedChunks = [];
+          uploadMessage.textContent = 'Recording stopped. Ready to upload.';
+          logToAPI('Recording stopped. Video blob is ready.');
+
+          // Set video preview to the recorded video
+          const recordedVideoURL = URL.createObjectURL(selectedVideoBlob);
+          videoPreview.srcObject = null;
+          videoPreview.src = recordedVideoURL;
+          videoPreview.controls = true;
+          videoPreview.play();
+
+          // Hide the recording indicator
+          recordingIndicator.style.display = 'none';
+
+          // Enable the upload button
+          uploadBtn.disabled = !selectedVideoBlob;
+        };
+        
+        mediaRecorder.start();
+        uploadMessage.textContent = 'Recording...';
+        logToAPI('MediaRecorder started.');
+
+        // Show the recording indicator
+        recordingIndicator.style.display = 'flex';
+      } catch (err) {
+        console.error('Could not start camera', err);
+        uploadMessage.textContent = `Error starting camera: ${err.message}`;
+        logToAPI(`Error accessing camera: ${err.message}`);
+      }
+    }
+
+    startRecordingBtn.onclick = () => {
+      startRecordingBtn.disabled = true;
+      stopRecordingBtn.disabled = false;
+      startCameraRecording();
+    };
+
+    stopRecordingBtn.onclick = () => {
+      stopRecordingBtn.disabled = true;
+      startRecordingBtn.disabled = false;
+      if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+        logToAPI('MediaRecorder stopped by user.');
+      }
+    };
+
+    /**
+     * 2) OR SELECT VIDEO FROM FILE SYSTEM
+     */
     videoFileInput.onchange = () => {
-      if (videoFileInput.files.length > 0) {
+      if (videoFileInput.files && videoFileInput.files.length > 0) {
         selectedVideoBlob = videoFileInput.files[0];
-        uploadMessage.innerText = `Selected: ${selectedVideoBlob.name} (size: ${selectedVideoBlob.size} bytes)`;
+        uploadMessage.textContent = `Selected file: ${selectedVideoBlob.name} (size: ${selectedVideoBlob.size} bytes)\nReady to upload.`;
+        statusMessage.textContent = 'Video file selected.';
+        downloadMessage.textContent = 'Waiting...';
+        logToAPI(`Video file selected: ${selectedVideoBlob.name} (${selectedVideoBlob.size} bytes)`);
+
+        // Display the selected video
+        const videoURL = URL.createObjectURL(selectedVideoBlob);
+        videoPreview.srcObject = null;
+        videoPreview.src = videoURL;
+        videoPreview.controls = true;
+        videoPreview.play();
+
+        // Enable the upload button
         uploadBtn.disabled = false;
       }
     };
 
+    /**
+     * 3) UPLOAD VIDEO FLOW:
+     *    - GET upload endpoint => returns { guid, version, presigned_url }
+     *      (Add the required x-api-version and x-api-key headers)
+     *    - PUT video to that presigned_url
+     *    - Poll /status/dev/{guid} every 60s until "status":"done"
+     *      (Also use x-api-* headers)
+     *    - GET /download/dev/{guid} => returns final presigned URL for JSON
+     *    - Display JSON predictions (right_prediction, right_confidence, etc.)
+     */
     uploadBtn.onclick = async () => {
-      if (!selectedVideoBlob) return;
-      uploadMessage.innerText = 'Requesting upload URL...';
+      if (!selectedVideoBlob) {
+        uploadMessage.textContent = 'No video to upload!';
+        logToAPI('Upload attempted without a video.');
+        return;
+      }
       uploadBtn.disabled = true;
+      uploadMessage.textContent = 'Starting upload process...';
+      statusMessage.textContent = 'Upload initiated.';
+      downloadMessage.textContent = 'Waiting...';
+      logToAPI('Upload process initiated.');
+
+      const timestamp = new Date().toISOString().replace(/[-:.TZ]/g, '');
+      const videoName = `web_upload_${timestamp}.mp4`; // Ensure the video has an extension
+      console.log(`Uploading video as: ${videoName}`);
+      logToAPI(`Uploading video as: ${videoName}`);
 
       try {
-        const response = await fetch(`https://ue7v1pazxb.execute-api.us-west-2.amazonaws.com/upload/dev/uploaded_video`, {
-          method: 'GET',
-          headers: { 'x-api-version': API_VERSION, 'x-api-key': API_KEY }
-        });
+        // 3.1) GET the upload endpoint with headers
+        const uploadEndpoint = `https://ue7v1pazxb.execute-api.us-west-2.amazonaws.com/upload/dev/${encodeURIComponent(videoName)}`;
+        logToAPI(`Requesting upload URL from: ${uploadEndpoint}`);
+        const uploadResponse = await fetch(
+          uploadEndpoint,
+          {
+            method: 'GET',
+            headers: {
+              'x-api-version': API_VERSION,
+              'x-api-key': API_KEY
+            }
+          }
+        );
+        if (!uploadResponse.ok) {
+          throw new Error(`Upload request failed: ${uploadResponse.status} ${uploadResponse.statusText}`);
+        }
+        const uploadData = await uploadResponse.json();
+        const { guid, presigned_url } = uploadData;
+        logToAPI(`Received upload details: GUID=${guid}, Presigned URL=${presigned_url}`);
 
-        const { guid, presigned_url } = await response.json();
-        uploadMessage.innerText = 'Uploading video...';
+        uploadMessage.textContent = `GUID: ${guid}\nPreparing to upload video...`;
 
-        await fetch(presigned_url, {
+        // 3.2) PUT the video file (binary) to the presigned URL
+        uploadMessage.textContent += '\nUploading video...';
+        logToAPI(`Uploading video to presigned URL: ${presigned_url}`);
+        const putResponse = await fetch(presigned_url, {
           method: 'PUT',
-          headers: { 'Content-Type': 'video/mp4' },
+          headers: {
+            'Content-Type': 'video/mp4'
+          },
           body: selectedVideoBlob
         });
+        if (!putResponse.ok) {
+          throw new Error(`PUT upload failed: ${putResponse.status} ${putResponse.statusText}`);
+        }
+        uploadMessage.textContent += '\nUpload success! Video uploaded to AWS.';
+        logToAPI('Video successfully uploaded to AWS.');
 
-        uploadMessage.innerText = 'Upload complete! Checking status...';
+        // 3.3) Poll the status until "done"
+        uploadMessage.textContent += '\nChecking processing status...';
+        statusMessage.textContent = 'Video uploaded. Processing started.';
         pollStatus(guid);
       } catch (error) {
-        uploadMessage.innerText = 'Upload failed: ' + error.message;
+        console.error('Upload flow error:', error);
+        uploadMessage.textContent += `\nUpload flow error: ${error.message}`;
+        logToAPI(`Upload flow error: ${error.message}`);
+        uploadBtn.disabled = false;
       }
     };
 
-    function pollStatus(guid) {
+    /**
+     * POLL STATUS: GET /status/dev/{guid}
+     * (with x-api-* headers)
+     */
+    async function pollStatus(guid) {
+      let pollCount = 0;
+      const maxPolls = 60; // e.g., poll for up to 60 minutes
+      const intervalTime = 60_000; // 60 seconds
+      logToAPI(`Starting to poll status for GUID: ${guid}`);
+
       const interval = setInterval(async () => {
-        const response = await fetch(`https://ue7v1pazxb.execute-api.us-west-2.amazonaws.com/status/dev/${guid}`, {
-          method: 'GET',
-          headers: { 'x-api-key': API_KEY }
-        });
-        const { status } = await response.json();
+        pollCount++;
+        logToAPI(`Polling status... Attempt #${pollCount}`);
+        statusMessage.textContent = `Status check #${pollCount}...`;
 
-        statusMessage.innerText = `Current Status: ${status}`;
+        try {
+          const statusEndpoint = `https://ue7v1pazxb.execute-api.us-west-2.amazonaws.com/status/dev/${encodeURIComponent(guid)}`;
+          logToAPI(`Requesting status from: ${statusEndpoint}`);
+          const statusRes = await fetch(
+            statusEndpoint,
+            {
+              method: 'GET',
+              headers: {
+                'x-api-key': API_KEY
+              }
+            }
+          );
+          if (!statusRes.ok) {
+            throw new Error(`Status poll error: ${statusRes.status} ${statusRes.statusText}`);
+          }
+          const statusData = await statusRes.json();
+          logToAPI(`Received status: ${JSON.stringify(statusData)}`);
+          statusMessage.textContent = `Current Status: ${statusData.status}`;
 
-        if (status === 'done') {
+          if (statusData.status === 'done') {
+            clearInterval(interval);
+            logToAPI('Processing done! Fetching final results.');
+            statusMessage.textContent += ' - Processing complete.';
+            downloadMessage.textContent = 'Processing complete. Fetching results...';
+            fetchFinalResults(guid);
+          } else if (pollCount >= maxPolls) {
+            clearInterval(interval);
+            statusMessage.textContent += ' - Maximum polling attempts reached.';
+            downloadMessage.textContent = 'Failed to process the video within the expected time.';
+            logToAPI('Maximum polling attempts reached without completion.');
+            uploadBtn.disabled = false;
+          }
+        } catch (err) {
+          statusMessage.textContent = `Status poll error: ${err.message}`;
+          logToAPI(`Status poll exception: ${err.message}`);
           clearInterval(interval);
-          fetchResults(guid);
+          uploadBtn.disabled = false;
         }
-      }, 60_000);
+      }, intervalTime);
     }
 
-    async function fetchResults(guid) {
-      const response = await fetch(`https://ue7v1pazxb.execute-api.us-west-2.amazonaws.com/download/dev/${guid}`, {
-        method: 'GET',
-        headers: { 'x-api-version': API_VERSION, 'x-api-key': API_KEY }
-      });
-      const { presigned_url } = await response.json();
+    /**
+     * 4) Once status is "done", GET /download/dev/{guid}
+     *    => returns { guid, version, presigned_url }
+     *    => final presigned URL (JSON) to fetch predictions
+     */
+    async function fetchFinalResults(guid) {
+      try {
+        const downloadEndpoint = `https://ue7v1pazxb.execute-api.us-west-2.amazonaws.com/download/dev/${encodeURIComponent(guid)}`;
+        logToAPI(`Requesting download URL from: ${downloadEndpoint}`);
+        const downloadRes = await fetch(
+          downloadEndpoint,
+          {
+            method: 'GET',
+            headers: {
+              'x-api-version': API_VERSION,
+              'x-api-key': API_KEY
+            }
+          }
+        );
+        if (!downloadRes.ok) {
+          throw new Error(`Download request failed: ${downloadRes.status} ${downloadRes.statusText}`);
+        }
+        const downloadData = await downloadRes.json();
+        const finalUrl = downloadData.presigned_url;
+        logToAPI(`Received final presigned URL: ${finalUrl}`);
 
-      const results = await fetch(presigned_url);
-      const finalJson = await results.json();
+        downloadMessage.textContent = `Download URL received. Fetching results...`;
 
-      downloadMessage.innerText = 'Download complete!';
-      resultsPanel.style.display = 'block';
-      resultsMessage.innerText = JSON.stringify(finalJson, null, 2);
+        // 4.1) GET the final JSON from the presigned URL
+        logToAPI(`Fetching final JSON from: ${finalUrl}`);
+        const finalRes = await fetch(finalUrl);
+        if (!finalRes.ok) {
+          throw new Error(`Final JSON fetch failed: ${finalRes.status} ${finalRes.statusText}`);
+        }
+        const finalJson = await finalRes.json();
+        logToAPI(`Final JSON received: ${JSON.stringify(finalJson)}`);
+
+        downloadMessage.textContent = `Final JSON:\n${JSON.stringify(finalJson, null, 2)}`;
+
+        // 4.2) Display the fields you need (e.g., right_prediction, left_prediction, etc.)
+        const { right_prediction, right_confidence, left_prediction, left_confidence } = finalJson;
+        downloadMessage.textContent += `\n\n** Results **\nRight: P=${right_prediction}, C=${right_confidence}\nLeft:  P=${left_prediction}, C=${left_confidence}`;
+        logToAPI('Displayed final results to the user.');
+      } catch (error) {
+        downloadMessage.textContent = `Final fetch error: ${error.message}`;
+        logToAPI(`Final fetch error: ${error.message}`);
+      }
     }
   </script>
 </body>
