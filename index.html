@@ -185,7 +185,7 @@
 
     <!-- OR SELECT VIDEO FROM FILE SYSTEM -->
     <label for="videoFile">Select or Record Video:</label>
-    <input type="file" id="videoFile" accept="video/*" capture="camera" disabled />
+    <input type="file" id="videoFile" accept="video/*" capture="" disabled />
     <hr/>
 
     <!-- UPLOAD ACTION -->
@@ -266,7 +266,7 @@
      * Initialize the Application After API Key is Set
      */
     function initializeApp() {
-      // Enable file input and upload button
+      // Enable file input
       videoFileInput.disabled = false;
       uploadBtn.disabled = true; // Will be enabled when a video is selected or recorded
       uploadMessage.textContent = 'API Key set. You can now record or select a video to upload.';
@@ -471,7 +471,7 @@
 
         // 4.2) Display the fields you need (e.g., right_prediction, left_prediction, etc.)
         const { right_prediction, right_confidence, left_prediction, left_confidence } = finalJson;
-        downloadMessage.textContent += `\n\nResults \nRight: HAL=${right_prediction}, Confidence=${right_confidence}\nLeft:  HAL=${left_prediction}, Confidence=${left_confidence}`;
+        downloadMessage.textContent += `\n\nResults\nRight: P=${right_prediction}, C=${right_confidence}\nLeft:  P=${left_prediction}, C=${left_confidence}`;
         logToAPI('Displayed final results to the user.');
       } catch (error) {
         downloadMessage.textContent = `Final fetch error: ${error.message}`;
