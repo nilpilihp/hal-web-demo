@@ -40,14 +40,32 @@
       box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
     }
 
-    /* Video Preview */
-    video {
+    /* Video Container */
+    #videoContainer {
+      position: relative;
       width: 100%;
       max-height: 300px;
       border-radius: 8px;
       background: #333;
       margin-bottom: 10px;
-      object-fit: cover;
+      overflow: hidden;
+    }
+
+    /* Video Preview */
+    video {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    /* Canvas for Keypoints */
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none; /* Allow clicks to pass through */
     }
 
     /* Panel Styling */
@@ -178,8 +196,11 @@
   </div>
   
   <div id="mainContent">
-    <!-- VIDEO PREVIEW -->
-    <video id="videoPreview" autoplay muted></video>
+    <!-- VIDEO PREVIEW WITH CANVAS OVERLAY -->
+    <div id="videoContainer">
+      <video id="videoPreview" autoplay muted></video>
+      <canvas id="keypointsCanvas"></canvas>
+    </div>
     
     <hr/>
 
@@ -227,6 +248,7 @@
     const submitApiKeyBtn = document.getElementById('submitApiKeyBtn');
 
     const videoPreview = document.getElementById('videoPreview');
+    const keypointsCanvas = document.getElementById('keypointsCanvas');
     const uploadBtn = document.getElementById('uploadBtn');
     const videoFileInput = document.getElementById('videoFile');
 
@@ -238,6 +260,8 @@
 
     // State
     let selectedVideoBlob = null; // Will hold the chosen or recorded video
+    let poseData = {}; // Will store pose_df from JSON
+    let frameRate = 30; // Assumed frame rate (adjust if known)
 
     /**
      * Utility Function to Log Messages to API Logs Panel
@@ -290,6 +314,12 @@
         videoPreview.src = videoURL;
         videoPreview.controls = true;
         videoPreview.play();
+
+        // Adjust canvas size once video metadata is loaded
+        videoPreview.onloadedmetadata = () => {
+          keypointsCanvas.width = videoPreview.videoWidth;
+          keypointsCanvas.height = videoPreview.videoHeight;
+        };
 
         // Enable the upload button
         uploadBtn.disabled = false;
@@ -365,6 +395,8 @@
         // 3.3) Poll the status until "done"
         uploadMessage.textContent += '\nChecking processing status...';
         statusMessage.textContent = 'Video uploaded. Processing started.';
+        logToAPI('Starting to poll processing status.');
+
         pollStatus(guid);
       } catch (error) {
         console.error('Upload flow error:', error);
@@ -467,15 +499,96 @@
         const finalJson = await finalRes.json();
         logToAPI(`Final JSON received: ${JSON.stringify(finalJson)}`);
 
-        // downloadMessage.textContent = `Final JSON:\n${JSON.stringify(finalJson, null, 2)}`;
+        // Store pose_df for rendering
+        poseData = finalJson.pose_df || {};
 
         // 4.2) Display the fields you need (e.g., right_prediction, left_prediction, etc.)
-        const { right_prediction, right_confidence, left_prediction, left_confidence } = finalJson;
-        downloadMessage.textContent += `\n\nResults\nRight: P=${right_prediction}, C=${right_confidence}\nLeft:  P=${left_prediction}, C=${left_confidence}`;
+        const { right_prediction, right_confidence, left_prediction, left_confidence, valid_frame_percentage } = finalJson;
+        downloadMessage.textContent += `\n\nResults\nRight: P=${right_prediction}, C=${right_confidence}\nLeft:  P=${left_prediction}, C=${left_confidence}\nValid Frames: ${valid_frame_percentage}%`;
         logToAPI('Displayed final results to the user.');
+
+        // Start rendering keypoints
+        setupCanvasRendering();
       } catch (error) {
         downloadMessage.textContent = `Final fetch error: ${error.message}`;
         logToAPI(`Final fetch error: ${error.message}`);
+      }
+    }
+
+    /**
+     * Setup Canvas Rendering for Keypoints Overlay
+     */
+    function setupCanvasRendering() {
+      if (Object.keys(poseData).length === 0) {
+        logToAPI('No pose data available for rendering.');
+        return;
+      }
+
+      // Ensure video metadata is loaded
+      if (videoPreview.readyState >= 2) { // HAVE_CURRENT_DATA
+        keypointsCanvas.width = videoPreview.videoWidth;
+        keypointsCanvas.height = videoPreview.videoHeight;
+      }
+
+      // Clear any existing drawings
+      const ctx = keypointsCanvas.getContext('2d');
+      ctx.clearRect(0, 0, keypointsCanvas.width, keypointsCanvas.height);
+
+      // Event listener for video playback to draw keypoints
+      videoPreview.addEventListener('timeupdate', drawKeypointsOverlay);
+    }
+
+    /**
+     * Draw Keypoints Overlay on Canvas Based on Current Video Time
+     */
+    function drawKeypointsOverlay() {
+      const currentTime = videoPreview.currentTime;
+      const currentFrame = Math.floor(currentTime * frameRate); // Approximate frame based on time and frame rate
+
+      if (poseData.hasOwnProperty(currentFrame)) {
+        const keypoints = poseData[currentFrame];
+        const ctx = keypointsCanvas.getContext('2d');
+
+        // Clear previous drawings
+        ctx.clearRect(0, 0, keypointsCanvas.width, keypointsCanvas.height);
+
+        // Set drawing styles
+        ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)';
+        ctx.lineWidth = 2;
+        ctx.fillStyle = 'rgba(0, 255, 0, 0.7)';
+
+        // Example keypoints to draw: shoulders, elbows, wrists
+        const joints = [
+          { x: keypoints.X_left_shoulder, y: keypoints.Y_left_shoulder },
+          { x: keypoints.X_right_shoulder, y: keypoints.Y_right_shoulder },
+          { x: keypoints.X_left_elbow, y: keypoints.Y_left_elbow },
+          { x: keypoints.X_right_elbow, y: keypoints.Y_right_elbow },
+          { x: keypoints.X_left_wrist, y: keypoints.Y_left_wrist },
+          { x: keypoints.X_right_wrist, y: keypoints.Y_right_wrist }
+        ];
+
+        // Draw circles for each joint
+        joints.forEach(joint => {
+          ctx.beginPath();
+          ctx.arc(joint.x, joint.y, 5, 0, 2 * Math.PI);
+          ctx.fill();
+        });
+
+        // Optionally, draw lines between joints (e.g., shoulder to elbow to wrist)
+        ctx.beginPath();
+        // Left arm
+        ctx.moveTo(keypoints.X_left_shoulder, keypoints.Y_left_shoulder);
+        ctx.lineTo(keypoints.X_left_elbow, keypoints.Y_left_elbow);
+        ctx.lineTo(keypoints.X_left_wrist, keypoints.Y_left_wrist);
+        // Right arm
+        ctx.moveTo(keypoints.X_right_shoulder, keypoints.Y_right_shoulder);
+        ctx.lineTo(keypoints.X_right_elbow, keypoints.Y_right_elbow);
+        ctx.lineTo(keypoints.X_right_wrist, keypoints.Y_right_wrist);
+        ctx.stroke();
+      } else {
+        // If no keypoints for the current frame, clear the canvas
+        const ctx = keypointsCanvas.getContext('2d');
+        ctx.clearRect(0, 0, keypointsCanvas.width, keypointsCanvas.height);
       }
     }
   </script>
