@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>HAL Web Demo</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 1em; }
+    #videoPreview { width: 100%; max-height: 300px; background: #333; }
+    #messages { margin-top: 1em; white-space: pre-wrap; }
+    button { margin: 0.2em 0; }
+    #apiKeyModal {
+      display: block; /* Show the modal by default */
+      position: fixed;
+      z-index: 1;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background-color: rgba(0,0,0,0.4);
+    }
+    #apiKeyModalContent {
+      background-color: #fefefe;
+      margin: 15% auto;
+      padding: 20px;
+      border: 1px solid #888;
+      width: 80%;
+      max-width: 400px;
+      text-align: center;
+    }
+    #apiKeyInput {
+      width: 80%;
+      padding: 8px;
+      margin-top: 10px;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>HAL Web Demo</h1>
+  
+  <!-- API Key Modal -->
+  <div id="apiKeyModal">
+    <div id="apiKeyModalContent">
+      <h2>Enter API Key</h2>
+      <input type="password" id="apiKeyInput" placeholder="API Key" />
+      <br/>
+      <button id="submitApiKeyBtn">Submit</button>
+    </div>
+  </div>
+  
+  <!-- VIDEO PREVIEW & RECORDING -->
+  <div>
+    <video id="videoPreview" autoplay muted></video><br/>
+    <button id="startRecordingBtn" disabled>Start Recording</button>
+    <button id="stopRecordingBtn" disabled>Stop Recording</button>
+  </div>
+  <hr/>
+  
+  <!-- OR SELECT VIDEO FROM FILE SYSTEM -->
+  <div>
+    <label for="videoFile">Select Video from Device:</label>
+    <input type="file" id="videoFile" accept="video/*" disabled />
+  </div>
+  <hr/>
+
+  <!-- UPLOAD ACTION -->
+  <button id="uploadBtn" disabled>Upload to AWS</button>
+
+  <div id="messages"></div>
+
+  <script>
+    /**
+     * API Configuration
+     * - API_VERSION is constant.
+     * - API_KEY is obtained from user input.
+     */
+    const API_VERSION = '0.4.0';
+    let API_KEY = null;
+
+    // DOM Elements
+    const apiKeyModal = document.getElementById('apiKeyModal');
+    const apiKeyInput = document.getElementById('apiKeyInput');
+    const submitApiKeyBtn = document.getElementById('submitApiKeyBtn');
+
+    const startRecordingBtn = document.getElementById('startRecordingBtn');
+    const stopRecordingBtn = document.getElementById('stopRecordingBtn');
+    const videoPreview = document.getElementById('videoPreview');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const videoFileInput = document.getElementById('videoFile');
+    const messages = document.getElementById('messages');
+
+    // State
+    let mediaRecorder;
+    let recordedChunks = [];
+    let selectedVideoBlob = null; // Will hold the chosen or recorded video
+
+    /**
+     * Handle API Key Submission
+     */
+    submitApiKeyBtn.onclick = () => {
+      const enteredKey = apiKeyInput.value.trim();
+      if (enteredKey) {
+        API_KEY = enteredKey;
+        apiKeyModal.style.display = 'none';
+        initializeApp();
+      } else {
+        alert('API Key is required to proceed.');
+      }
+    };
+
+    /**
+     * Initialize the Application After API Key is Set
+     */
+    function initializeApp() {
+      // Enable buttons now that API_KEY is set
+      startRecordingBtn.disabled = false;
+      videoFileInput.disabled = false;
+      uploadBtn.disabled = true; // Will be enabled when a video is selected or recorded
+      messages.innerText = 'API Key set. You can now record or select a video to upload.';
+    }
+
+    /**
+     * 1) ALLOW CAMERA PREVIEW & RECORD
+     */
+    async function startCameraRecording() {
+      messages.innerText = 'Accessing camera...';
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        videoPreview.srcObject = stream;
+
+        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data.size > 0) {
+            recordedChunks.push(e.data);
+          }
+        };
+        mediaRecorder.onstop = () => {
+          selectedVideoBlob = new Blob(recordedChunks, { type: 'video/mp4' });
+          recordedChunks = [];
+          messages.innerText += '\nRecording stopped. Ready to upload.';
+          // Enable the upload button
+          uploadBtn.disabled = !selectedVideoBlob;
+        };
+        
+        mediaRecorder.start();
+        messages.innerText = 'Recording...';
+      } catch (err) {
+        console.error('Could not start camera', err);
+        messages.innerText = `Error starting camera: ${err.message}`;
+      }
+    }
+
+    startRecordingBtn.onclick = () => {
+      startRecordingBtn.disabled = true;
+      stopRecordingBtn.disabled = false;
+      startCameraRecording();
+    };
+
+    stopRecordingBtn.onclick = () => {
+      stopRecordingBtn.disabled = true;
+      startRecordingBtn.disabled = false;
+      if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+      }
+    };
+
+    /**
+     * 2) OR SELECT VIDEO FROM FILE SYSTEM
+     */
+    videoFileInput.onchange = () => {
+      if (videoFileInput.files && videoFileInput.files.length > 0) {
+        selectedVideoBlob = videoFileInput.files[0];
+        messages.innerText = `Selected file: ${selectedVideoBlob.name} (size: ${selectedVideoBlob.size} bytes)\nReady to upload.`;
+        uploadBtn.disabled = false;
+      }
+    };
+
+    /**
+     * 3) UPLOAD VIDEO FLOW:
+     *    - GET upload endpoint => returns { guid, version, presigned_url }
+     *      (Add the required x-api-version and x-api-key headers)
+     *    - PUT video to that presigned_url
+     *    - Poll /status/dev/{guid} every 60s until "status":"done"
+     *      (Also use x-api-* headers)
+     *    - GET /download/dev/{guid} => returns final presigned URL for JSON
+     *    - Display JSON predictions (right_prediction, right_confidence, etc.)
+     */
+    uploadBtn.onclick = async () => {
+      if (!selectedVideoBlob) {
+        messages.innerText = 'No video to upload!';
+        return;
+      }
+      uploadBtn.disabled = true;
+      messages.innerText = 'Requesting upload URL...';
+
+      const timestamp = new Date().toISOString().replace(/[-:.TZ]/g, '');
+      const videoName = `web_upload_${timestamp}`;
+      console.log(`Uploading video as: ${videoName}`);
+
+      try {
+        // 3.1) GET the upload endpoint with headers
+        const uploadResponse = await fetch(
+          `https://ue7v1pazxb.execute-api.us-west-2.amazonaws.com/upload/dev/${videoName}`,
+          {
+            method: 'GET',
+            headers: {
+              'x-api-version': API_VERSION,
+              'x-api-key': API_KEY
+            }
+          }
+        );
+        if (!uploadResponse.ok) {
+          throw new Error(`Upload request failed: ${uploadResponse.status} ${uploadResponse.statusText}`);
+        }
+        const uploadData = await uploadResponse.json();
+        const { guid, presigned_url } = uploadData;
+
+        messages.innerText += `\nGUID: ${guid}\nPUT => ${presigned_url}`;
+
+        // 3.2) PUT the video file (binary) to the presigned URL
+        messages.innerText += '\nUploading video...';
+        const putResponse = await fetch(presigned_url, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'video/mp4'
+          },
+          body: selectedVideoBlob
+        });
+        if (!putResponse.ok) {
+          throw new Error(`PUT upload failed: ${putResponse.status} ${putResponse.statusText}`);
+        }
+        messages.innerText += '\nUpload success! Now checking status...';
+
+        // 3.3) Poll the status until "done"
+        pollStatus(guid);
+      } catch (error) {
+        console.error('Upload flow error:', error);
+        messages.innerText += `\nUpload flow error: ${error}`;
+        uploadBtn.disabled = false;
+      }
+    };
+
+    /**
+     * POLL STATUS: GET /status/dev/{guid}
+     * (with x-api-* headers)
+     */
+    async function pollStatus(guid) {
+      let pollCount = 0;
+      const interval = setInterval(async () => {
+        pollCount++;
+        messages.innerText += `\nStatus check #${pollCount}...`;
+
+        try {
+          const statusRes = await fetch(
+            `https://ue7v1pazxb.execute-api.us-west-2.amazonaws.com/status/dev/${guid}`,
+            {
+              method: 'GET',
+              headers: {
+                'x-api-version': API_VERSION,
+                'x-api-key': API_KEY
+              }
+            }
+          );
+          if (!statusRes.ok) {
+            messages.innerText += `\nStatus poll error: ${statusRes.status} ${statusRes.statusText}`;
+            return;
+          }
+          const statusData = await statusRes.json();
+          messages.innerText += `\nCurrent Status: ${JSON.stringify(statusData)}`;
+
+          if (statusData.status === 'done') {
+            clearInterval(interval);
+            messages.innerText += `\nProcessing done! Fetching results...`;
+            fetchFinalResults(guid);
+          }
+        } catch (err) {
+          messages.innerText += `\nStatus poll exception: ${err.message}`;
+        }
+      }, 60_000); // Poll every 60 seconds
+    }
+
+    /**
+     * 4) Once status is "done", GET /download/dev/{guid}
+     *    => returns { guid, version, presigned_url }
+     *    => final presigned URL (JSON) to fetch predictions
+     */
+    async function fetchFinalResults(guid) {
+      try {
+        const downloadRes = await fetch(
+          `https://ue7v1pazxb.execute-api.us-west-2.amazonaws.com/download/dev/${guid}`,
+          {
+            method: 'GET',
+            headers: {
+              'x-api-version': API_VERSION,
+              'x-api-key': API_KEY
+            }
+          }
+        );
+        if (!downloadRes.ok) {
+          throw new Error(`Download request failed: ${downloadRes.status} ${downloadRes.statusText}`);
+        }
+        const downloadData = await downloadRes.json();
+        const finalUrl = downloadData.presigned_url;
+
+        messages.innerText += `\nDownload from => ${finalUrl}`;
+
+        // 4.1) GET the final JSON from the presigned URL
+        const finalRes = await fetch(finalUrl);
+        if (!finalRes.ok) {
+          throw new Error(`Final JSON fetch failed: ${finalRes.status} ${finalRes.statusText}`);
+        }
+        const finalJson = await finalRes.json();
+        messages.innerText += `\nFinal JSON:\n${JSON.stringify(finalJson, null, 2)}`;
+
+        // 4.2) Display the fields you need (e.g., right_prediction, left_prediction, etc.)
+        const { right_prediction, right_confidence, left_prediction, left_confidence } = finalJson;
+        messages.innerText += `\n\n** Results **\nRight: P=${right_prediction}, C=${right_confidence}\nLeft:  P=${left_prediction}, C=${left_confidence}`;
+
+      } catch (error) {
+        messages.innerText += `\nFinal fetch error: ${error}`;
+      }
+    }
+  </script>
+</body>
+</html>
