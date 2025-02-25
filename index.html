@@ -190,7 +190,7 @@
     <div class="panel" id="resultsPanel">
       <h3>Live Video Preview</h3>
       <div id="videoContainer">
-        <video id="videoPreview" autoplay muted></video>
+        <video id="videoPreview" autoplay muted playsinline webkit-playsinline></video>
         <canvas id="keypointsCanvas"></canvas>
       </div>
       <div id="inferenceResults" class="panel-content">
@@ -385,7 +385,7 @@
           }
         });
         if (!uploadResponse.ok) {
-          throw new Error(`Upload request failed: ${uploadResponse.status} ${uploadResponse.statusText}`);
+          throw new Error(`Upload request failed: ${uploadResponse.status} ${uploadResponse.statusText}`);\
         }
         const uploadData = await uploadResponse.json();
         const { guid, presigned_url } = uploadData;
@@ -534,7 +534,7 @@
 
       // Sample JSON response for debug mode
       const debugJson = {
-        "version": "0.4.1",
+        "version": API_VERSION,
         "status": "success",
         "message": "Debug inference completed successfully",
         "right_prediction": 2,
