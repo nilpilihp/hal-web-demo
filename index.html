@@ -242,7 +242,7 @@
 
   <script>
     /***** Global Variables & DOM Elements *****/
-    const API_VERSION = '0.4.0';
+    const API_VERSION = '0.4.1';
     let API_KEY = null;
     let selectedVideoBlob = null;
     let poseData = {};
@@ -475,7 +475,6 @@
         const downloadRes = await fetch(downloadEndpoint, {
           method: 'GET',
           headers: {
-            'x-api-version': API_VERSION,
             'x-api-key': API_KEY
           }
         });
@@ -547,13 +546,27 @@
           "X_right_wrist","Y_right_wrist"
         ],
         "pose_df": {
-            "0": [323,7,996,681,880,67,552,10,919,354,500,151,815,492,397,225],
-            "1": [272,7,963,715,859,50,521,10,917,298,384,120,712,372,389,250],
-            "2": [286,8,964,715,858,48,527,10,917,297,382,122,713,369,410,275],
-            "3": [300,8,968,701,861,46,533,10,909,297,384,128,707,368,440,299],
-            "4": [314,7,972,687,864,44,538,10,900,296,386,134,702,366,469,323]
-          }
-       
+          "10": [320, 6, 978, 678, 870, 42, 545, 10, 895, 295, 390, 140, 700, 365, 480, 340],
+          "11": [320, 6, 978, 678, 2, 42, 545, 10, 4, 295, 390, 140, 700, 365, 480, 340],
+          "12": [320, 6, 978, 678, 870, 42, 545, 10, 895, 295, 390, 140, 3, 365, 480, 340],
+          "13": [320, 6, 978, 678, 870, 42, 545, 10, 4, 295, 390, 140, 700, 365, 480, 340],
+          "14": [320, 6, 978, 678, 870, 42, 545, 10, 895, 295, 390, 140, 700, 365, 480, 340],
+          "15": [320, 6, 978, 2, 870, 42, 545, 10, 895, 295, 390, 140, 700, 365, 480, 340],
+          "16": [320, 6, 978, 678, 870, 42, 545, 10, 895, 295, 390, 140, 700, 365, 480, 340],
+          "17": [320, 6, 978, 678, 870, 42, 545, 10, 4, 295, 390, 140, 700, 365, 480, 340],
+          "18": [320, 6, 978, 678, 870, 42, 545, 10, 895, 2, 390, 140, 700, 365, 480, 340],
+          "19": [320, 6, 978, 678, 870, 42, 545, 10, 895, 295, 390, 140, 700, 365, 480, 340],
+          "20": [310, 8, 960, 690, 855, 48, 530, 10, 910, 299, 385, 130, 705, 370, 460, 310],
+          "21": [272, 7, 963, 715, 859, 50, 521, 10, 917, 298, 384, 120, 712, 372, 389, 250],
+          "22": [286, 8, 964, 715, 858, 48, 527, 10, 917, 297, 382, 122, 713, 369, 410, 275],
+          "23": [300, 8, 968, 701, 861, 46, 533, 10, 909, 297, 384, 128, 707, 368, 440, 299],
+          "24": [314, 7, 972, 687, 864, 44, 538, 10, 900, 296, 386, 134, 702, 366, 469, 323],
+          "25": [320, 6, 978, 678, 870, 42, 545, 10, 895, 295, 390, 140, 700, 365, 480, 340],
+          "26": [320, 6, 978, 678, 870, 42, 545, 10, 895, 295, 390, 140, 700, 365, 480, 340],
+          "27": [320, 6, 978, 678, 870, 42, 545, 10, 895, 295, 390, 140, 2, 365, 480, 340],
+          "28": [320, 6, 978, 678, 2, 42, 545, 10, 895, 295, 390, 140, 700, 365, 480, 340],
+          "29": [320, 6, 978, 678, 870, 42, 545, 10, 895, 295, 390, 140, 700, 365, 480, 340],
+        }
       };
      
 
@@ -588,35 +601,37 @@
         keypointsCanvas.width = videoPreview.videoWidth;
         keypointsCanvas.height = videoPreview.videoHeight;
       }
-      const ctx = keypointsCanvas.getContext('2d');
-      ctx.clearRect(0, 0, keypointsCanvas.width, keypointsCanvas.height);
-      videoPreview.addEventListener('timeupdate', drawKeypointsOverlay);
-      logToAPI('Keypoints overlay setup complete.');
-    }
 
-    /** Draw keypoints overlay based on current frame **/
+      // Start the render loop when the video plays
+      videoPreview.addEventListener('play', () => {
+        renderLoop();
+      });
+      logToAPI('Keypoints overlay setup complete.');
+
+    }
+    /** Render loop that draws keypoints at every animation frame **/
+    function renderLoop() {
+      if (videoPreview.paused || videoPreview.ended) {
+        return; // Stop the loop if video is not playing
+      }
+      drawKeypointsOverlay();
+      requestAnimationFrame(renderLoop);
+    }
+    /** Draw keypoints overlay based on the current frame **/
     function drawKeypointsOverlay() {
       const currentTime = videoPreview.currentTime;
       const currentFrame = Math.floor(currentTime * frameRate);
       const ctx = keypointsCanvas.getContext('2d');
-      
-      // Clear the canvas first
       ctx.clearRect(0, 0, keypointsCanvas.width, keypointsCanvas.height);
       
-      // Check if we have data for this frame
       if (poseData.hasOwnProperty(currentFrame)) {
-        // poseData[currentFrame] is an array, e.g. [318, 10, 999, 678, ...]
         const arr = poseData[currentFrame];
-        
-        // Turn that array into a dictionary/object using poseKeys
         const frameData = {};
         poseKeys.forEach((keyName, idx) => {
           frameData[keyName] = arr[idx];
         });
         
-        // Now frameData has named fields like frameData.Box_X1, frameData.X_left_shoulder, etc.
-        
-        // -- Draw bounding box --
+        // Draw bounding box
         ctx.strokeStyle = 'rgba(0, 255, 0, 0.8)';
         ctx.lineWidth = 3;
         ctx.strokeRect(
@@ -626,7 +641,7 @@
           frameData.Box_Y2 - frameData.Box_Y1
         );
         
-        // -- Draw joints --
+        // Draw joints
         ctx.fillStyle = 'rgba(0, 255, 0, 0.9)';
         const joints = [
           { x: frameData.X_left_shoulder,  y: frameData.Y_left_shoulder  },
@@ -641,8 +656,8 @@
           ctx.arc(joint.x, joint.y, 7, 0, 2 * Math.PI);
           ctx.fill();
         });
-
-        // -- Draw lines connecting the arm joints --
+        
+        // Draw connecting lines between joints
         ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)';
         ctx.lineWidth = 4;
         ctx.beginPath();
@@ -659,56 +674,6 @@
         logToAPI(`Keypoints drawn for frame ${currentFrame}.`);
       }
     }
-
-    // function drawKeypointsOverlay() {
-    //   const currentTime = videoPreview.currentTime;
-    //   const currentFrame = Math.floor(currentTime * frameRate);
-    //   const ctx = keypointsCanvas.getContext('2d');
-    //   if (poseData.hasOwnProperty(currentFrame)) {
-    //     const keypoints = poseData[currentFrame];
-    //     ctx.clearRect(0, 0, keypointsCanvas.width, keypointsCanvas.height);
-    //     // Draw bounding box
-    //     ctx.strokeStyle = 'rgba(0, 255, 0, 0.8)';
-    //     ctx.lineWidth = 3;
-    //     ctx.strokeRect(
-    //       keypoints.Box_X1,
-    //       keypoints.Box_Y1,
-    //       keypoints.Box_X2 - keypoints.Box_X1,
-    //       keypoints.Box_Y2 - keypoints.Box_Y1
-    //     );
-    //     // Draw joints
-    //     ctx.fillStyle = 'rgba(0, 255, 0, 0.9)';
-    //     const joints = [
-    //       { x: keypoints.X_left_shoulder, y: keypoints.Y_left_shoulder },
-    //       { x: keypoints.X_right_shoulder, y: keypoints.Y_right_shoulder },
-    //       { x: keypoints.X_left_elbow, y: keypoints.Y_left_elbow },
-    //       { x: keypoints.X_right_elbow, y: keypoints.Y_right_elbow },
-    //       { x: keypoints.X_left_wrist, y: keypoints.Y_left_wrist },
-    //       { x: keypoints.X_right_wrist, y: keypoints.Y_right_wrist }
-    //     ];
-    //     joints.forEach(joint => {
-    //       ctx.beginPath();
-    //       ctx.arc(joint.x, joint.y, 7, 0, 2 * Math.PI);
-    //       ctx.fill();
-    //     });
-    //     // Draw connecting lines
-    //     ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)';
-    //     ctx.lineWidth = 4;
-    //     ctx.beginPath();
-    //     // Left arm
-    //     ctx.moveTo(keypoints.X_left_shoulder, keypoints.Y_left_shoulder);
-    //     ctx.lineTo(keypoints.X_left_elbow, keypoints.Y_left_elbow);
-    //     ctx.lineTo(keypoints.X_left_wrist, keypoints.Y_left_wrist);
-    //     // Right arm
-    //     ctx.moveTo(keypoints.X_right_shoulder, keypoints.Y_right_shoulder);
-    //     ctx.lineTo(keypoints.X_right_elbow, keypoints.Y_right_elbow);
-    //     ctx.lineTo(keypoints.X_right_wrist, keypoints.Y_right_wrist);
-    //     ctx.stroke();
-    //     logToAPI(`Keypoints drawn for frame ${currentFrame}.`);
-    //   } else {
-    //     ctx.clearRect(0, 0, keypointsCanvas.width, keypointsCanvas.height);
-    //   }
-    // }
   </script>
 </body>
 </html>
