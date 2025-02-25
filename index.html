@@ -494,6 +494,8 @@
         logToAPI(`Final JSON: ${JSON.stringify(finalJson)}`);
 
         poseData = finalJson.pose_df || {};
+        poseKeys = finalJson.pose_keys || [];
+
         const { right_prediction, right_confidence, left_prediction, left_confidence } = finalJson;
         downloadMessage.textContent += `\nRight: HAL=${right_prediction} (${(right_confidence*100).toFixed(0)}%)\nLeft: HAL=${left_prediction} (${(left_confidence*100).toFixed(0)}%)`;
         inferenceResults.innerHTML = `
@@ -509,6 +511,10 @@
         `;
         logToAPI('Final results displayed.');
         setupCanvasRendering();
+        // If the video is already playing, immediately start the render loop.
+        if (videoPreview.paused || videoPreview.ended) {
+          videoPreview.play();
+        }
       } catch (error) {
         downloadMessage.textContent = `Error: ${error.message}`;
         logToAPI(`Download error: ${error.message}`);
