@@ -134,7 +134,7 @@
       white-space: pre-wrap;
     }
     /* API Key Modal */
-    #apiKeyModal {
+    #apiKeyModel {
       display: flex;
       align-items: center;
       justify-content: center;
@@ -146,7 +146,7 @@
       height: 100%;
       background-color: rgba(0,0,0,0.5);
     }
-    #apiKeyModalContent {
+    #apiKeyModelContent {
       background: #fff;
       padding: 30px;
       border-radius: 12px;
@@ -177,8 +177,8 @@
   <h1>HAL Web Demo</h1>
   
   <!-- API Key Modal -->
-  <div id="apiKeyModal">
-    <div id="apiKeyModalContent">
+  <div id="apiKeyModel">
+    <div id="apiKeyModelContent">
       <h2>Enter API Key</h2>
       <input type="password" id="apiKeyInput" placeholder="API Key" />
       <button id="submitApiKeyBtn">Submit</button>
@@ -213,9 +213,18 @@
       <!-- Debug Button -->
       <button id="debugBtn" disabled>Debug Test</button>
     </div>
-
-    <!-- Upload button if needed -->
+    
+    <!-- New Dropdown for API Version selection -->
     <div class="action-buttons">
+      <select id="versionSelect">
+        <option value="0.5.1" selected>0.5.1</option>
+        <option value="0.5.0">0.5.0</option>
+        <option value="0.4.3">0.4.3</option>
+        <option value="0.4.2">0.4.2</option>
+        <option value="0.4.1">0.4.1</option>
+        <option value="0.4.0">0.4.0</option>
+        <option value="0.3.3">0.3.3</option>
+      </select>
       <button id="uploadBtn" disabled>Upload to AWS</button>
     </div>
 
@@ -250,7 +259,7 @@
     let frameRate = 30; // Assumed frame rate
 
     // Modal
-    const apiKeyModal = document.getElementById('apiKeyModal');
+    const apiKeyModel = document.getElementById('apiKeyModel');
     const apiKeyInput = document.getElementById('apiKeyInput');
     const submitApiKeyBtn = document.getElementById('submitApiKeyBtn');
 
@@ -267,8 +276,10 @@
     const selectBtn = document.getElementById('selectBtn');
     const debugBtn = document.getElementById('debugBtn');
     const uploadBtn = document.getElementById('uploadBtn');
+    // Dropdown
+    const versionSelect = document.getElementById('versionSelect');
 
-    // Status messages
+    // Status messages  
     const uploadMessage = document.getElementById('uploadMessage');
     const statusMessage = document.getElementById('statusMessage');
     const downloadMessage = document.getElementById('downloadMessage');
@@ -288,7 +299,7 @@
       const enteredKey = apiKeyInput.value.trim();
       if (enteredKey) {
         API_KEY = enteredKey;
-        apiKeyModal.style.display = 'none';
+        apiKeyModel.style.display = 'none';
         initializeApp();
       } else {
         alert('API Key is required to proceed.');
@@ -380,7 +391,7 @@
         const uploadResponse = await fetch(uploadEndpoint, {
           method: 'GET',
           headers: {
-            'x-api-version': API_VERSION,
+            'x-api-version': versionSelect.value,
             'x-api-key': API_KEY
           }
         });
