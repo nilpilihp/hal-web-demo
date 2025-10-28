@@ -1,292 +1,750 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>HAL Web Demo</title>
   <style>
-    /* Reset and Base Styling */
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
+    :root {
+      --bg: #f6f8fb;
+      --surface: #ffffff;
+      --surface-muted: #eef2f9;
+      --border: #dce4f2;
+      --border-strong: #cad3e3;
+      --text: #101728;
+      --text-muted: #5c6475;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --accent-soft: rgba(37, 99, 235, 0.08);
+      --success: #047857;
+      --info: #0f766e;
+      --radius: 16px;
+      --shadow: 0 28px 60px -45px rgba(15, 23, 42, 0.65);
+      --transition: 0.2s ease;
     }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+
     body {
-      font-family: 'Helvetica Neue', Arial, sans-serif;
-      background: #f0f2f5;
-      color: #333;
-      max-width: 1200px;
-      margin: 20px auto;
-      padding: 1em;
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+      line-height: 1.5;
+    }
+
+    h1, h2, h3 {
+      font-weight: 600;
+      color: var(--text);
+      margin: 0;
+    }
+
+    .page {
+      max-width: 1100px;
+      margin: 56px auto 72px;
+      padding: 0 28px;
+    }
+
+    .page-header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    h1 {
+      font-size: clamp(2rem, 2.5vw + 1.4rem, 2.75rem);
+      letter-spacing: -0.01em;
+    }
+
+    .page-subtitle {
+      margin-top: 8px;
+      font-size: 1rem;
+      color: var(--text-muted);
+    }
+
+    .layout {
+      display: grid;
+      gap: 28px;
+    }
+
+    .surface {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 24px;
       display: flex;
       flex-direction: column;
-      align-items: center;
+      gap: 20px;
     }
-    h1, h2, h3 {
-      color: #007BFF;
-      text-align: center;
+
+    .surface__header h2 {
+      font-size: 1.25rem;
     }
-    h1 {
-      font-size: 2.5em;
-      margin-bottom: 0.2em;
+
+    .surface__description {
+      margin-top: 6px;
+      color: var(--text-muted);
+      font-size: 0.95rem;
     }
-    h3 {
-      font-size: 1.5em;
-    }
-    /* Main Container */
-    #mainContent {
-      width: 100%;
-      background: #fff;
-      border-radius: 10px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-      padding: 25px;
-      margin-bottom: 20px;
-    }
-    /* Video and Canvas Styling */
-    #videoContainer {
+
+    .media {
       position: relative;
-      width: 100%;
-      background: #000;
-      border-radius: 10px;
+      border-radius: calc(var(--radius) - 4px);
+      background: #0f172a;
       overflow: hidden;
+      min-height: 300px;
     }
-    video {
+
+    #videoPreview {
       width: 100%;
+      height: auto;
       display: block;
+      object-fit: contain;
+      background: #000;
     }
-    canvas {
+
+    #keypointsCanvas {
       position: absolute;
-      top: 0;
-      left: 0;
+      inset: 0;
       width: 100%;
       height: 100%;
       pointer-events: none;
     }
-    /* Panels */
-    .panel {
-      border: 1px solid #e0e0e0;
-      padding: 20px;
-      margin-top: 20px;
-      border-radius: 10px;
-      background: #fafafa;
+
+    .callout {
+      border: 1px solid var(--border);
+      border-radius: calc(var(--radius) - 6px);
+      background: var(--surface-muted);
+      padding: 18px 20px;
     }
-    .panel h3 {
-      margin-bottom: 15px;
-      font-size: 1.5em;
-      text-align: center;
-    }
-    .panel-content {
-      font-size: 1.1em;
-      color: #555;
-      white-space: pre-wrap;
-      text-align: center;
-    }
-    /* Action Buttons Container */
-    .action-buttons {
+
+    .callout--results {
       display: flex;
-      gap: 20px;
-      justify-content: center;
-      margin-top: 20px;
-      flex-wrap: wrap;
+      flex-direction: column;
+      gap: 16px;
     }
-    button {
-      padding: 12px 20px;
-      font-size: 1.1em;
-      font-weight: bold;
-      border: none;
-      border-radius: 8px;
+
+    .result-placeholder {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    .result-group {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    }
+
+    .result-item {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      background: var(--surface);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .result-item[data-tone="success"] .value {
+      color: var(--success);
+    }
+
+    .result-item[data-tone="info"] .value {
+      color: var(--info);
+    }
+
+    .result-item .label {
+      font-size: 0.75rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .result-item .value {
+      font-size: 1.3rem;
+      font-weight: 600;
+    }
+
+    .result-item .meta {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+    }
+
+    .result-warning {
+      border-radius: 10px;
+      padding: 12px 14px;
+      background: var(--accent-soft);
+      color: var(--accent-hover);
+      font-size: 0.9rem;
+    }
+
+    .button {
+      appearance: none;
+      border: 1px solid transparent;
+      border-radius: 999px;
+      padding: 0 22px;
+      height: 44px;
+      line-height: 1;
+      font-size: 0.95rem;
+      font-weight: 600;
       cursor: pointer;
-      transition: background 0.3s, transform 0.1s;
-      background: #007BFF;
+      transition: transform var(--transition), box-shadow var(--transition), background var(--transition), color var(--transition);
+      background: var(--surface-muted);
+      color: var(--text);
+    }
+
+    .workflow-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      align-items: stretch;
+    }
+
+    .workflow-actions__primary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: center;
+    }
+
+    .workflow-actions__primary .button {
+      flex: 1 1 220px;
+      height: 52px;
+      font-size: 1rem;
+      border-radius: 14px;
+    }
+
+    #selectBtn.button--primary {
+      box-shadow: 0 22px 40px -26px rgba(37, 99, 235, 0.75);
+    }
+
+    #uploadBtn {
+      background: #111827;
       color: #fff;
-      min-width: 120px;
     }
-    button:hover {
-      background: #0056b3;
+
+    #uploadBtn:hover:not(:disabled) {
+      background: #0f172a;
     }
-    button:disabled {
-      background: #ccc;
+
+    #uploadBtn:disabled {
+      background: rgba(15, 23, 42, 0.28);
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    .workflow-actions__secondary {
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    #debugBtn {
+      border-color: var(--border);
+      background: rgba(15, 23, 42, 0.05);
+      color: var(--text-muted);
+      padding: 0 18px;
+      height: 44px;
+    }
+
+    #debugBtn:hover:not(:disabled),
+    #debugBtn:focus-visible {
+      background: rgba(15, 23, 42, 0.12);
+      border-color: rgba(15, 23, 42, 0.28);
+      color: var(--text);
+    }
+
+    #debugBtn:disabled {
+      opacity: 0.5;
+    }
+
+    @media (max-width: 600px) {
+      .workflow-actions__primary {
+        flex-direction: column;
+      }
+
+      .workflow-actions__secondary {
+        justify-content: center;
+      }
+    }
+
+    .button:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 20px -18px rgba(15, 23, 42, 0.55);
+    }
+
+    .button:disabled {
       cursor: not-allowed;
+      opacity: 0.6;
+      transform: none;
+      box-shadow: none;
     }
-    button:active {
-      transform: scale(0.96);
+
+    .button--primary {
+      background: var(--accent);
+      color: #fff;
     }
-    /* Hidden file inputs */
+
+    .button--primary:hover:not(:disabled) {
+      background: var(--accent-hover);
+    }
+
+    .button--ghost {
+      background: transparent;
+      border-color: var(--border-strong);
+    }
+
+    .button--ghost:hover:not(:disabled) {
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .select-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 220px;
+    }
+
+    .select-label {
+      font-size: 0.75rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    select {
+      width: 100%;
+      height: 44px;
+      padding: 0 14px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface-muted);
+      color: var(--text);
+      font-size: 0.95rem;
+      transition: border-color var(--transition), box-shadow var(--transition);
+    }
+
+    select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25);
+      outline: none;
+    }
+
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    .model-status {
+      display: grid;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .model-status__item {
+      appearance: none;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--surface-muted);
+      color: inherit;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 12px 14px;
+      width: 100%;
+      text-align: left;
+      font: inherit;
+      cursor: pointer;
+      transition: border-color var(--transition), background var(--transition), box-shadow var(--transition);
+    }
+
+    .model-status__item:hover,
+    .model-status__item:focus-visible {
+      border-color: var(--accent);
+      box-shadow: 0 8px 20px -18px rgba(15, 23, 42, 0.45);
+      outline: none;
+    }
+
+    .model-status__item[aria-checked="true"] {
+      border-color: var(--accent);
+      background: rgba(37, 99, 235, 0.08);
+    }
+
+    .model-status__main {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 600;
+    }
+
+    .model-status__meta {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    .status-indicator {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      background: var(--border-strong);
+      box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.25);
+    }
+
+    .status-indicator--online {
+      background: #16a34a;
+      box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.25);
+    }
+
+    .status-indicator--offline {
+      background: #dc2626;
+      box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.25);
+    }
+
+    .model-status__placeholder {
+      padding: 14px 16px;
+      border: 1px dashed var(--border);
+      border-radius: 12px;
+      background: var(--surface-muted);
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      text-align: center;
+    }
+
+    .model-status__placeholder--error {
+      border-color: rgba(248, 113, 113, 0.6);
+      color: #b91c1c;
+    }
+
+    .model-status__meta strong {
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .model-status__item[disabled] {
+      opacity: 0.6;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    .model-status__placeholder--error {
+      border-color: rgba(248, 113, 113, 0.6);
+      color: #b91c1c;
+    }
+
     input[type="file"] {
       display: none;
     }
-    /* API Logs Styling */
-    #apiLogs {
+
+    input[type="password"] {
       width: 100%;
-      margin-top: 30px;
-      padding: 20px;
-      border-radius: 8px;
-      background: #e9ecef;
-      font-size: 1em;
-      max-height: 300px;
-      overflow-y: auto;
+      height: 44px;
+      padding: 0 14px;
+      border: 1px solid var(--border-strong);
+      border-radius: 10px;
+      background: var(--surface-muted);
+      font-size: 1rem;
+      transition: border-color var(--transition), box-shadow var(--transition);
     }
-    #apiLogs h3 {
-      margin-bottom: 10px;
+
+    input[type="password"]:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25);
+      outline: none;
     }
+
+    .status-grid {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+
+    .status-block {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 18px;
+      background: var(--surface-muted);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 122px;
+    }
+
+    .status-block h3 {
+      font-size: 0.85rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .status-copy {
+      font-size: 0.95rem;
+      color: var(--text);
+      white-space: pre-line;
+    }
+
+    .surface--logs {
+      margin-top: 28px;
+    }
+
     #logsContent {
+      border: 1px solid var(--border);
+      border-radius: calc(var(--radius) - 6px);
+      padding: 16px;
+      background: var(--surface-muted);
+      font-family: 'JetBrains Mono', 'Fira Code', 'SFMono-Regular', Menlo, monospace;
+      font-size: 0.85rem;
+      color: var(--text-muted);
       white-space: pre-wrap;
+      overflow-y: auto;
+      max-height: 280px;
     }
-    /* API Key Modal */
-    #apiKeyModel {
+
+    .modal {
+      position: fixed;
+      inset: 0;
       display: flex;
       align-items: center;
       justify-content: center;
-      position: fixed;
-      z-index: 1000;
-      left: 0;
-      top: 0;
-      width: 100%;
-      height: 100%;
-      background-color: rgba(0,0,0,0.5);
+      padding: 24px;
+      background: rgba(15, 23, 42, 0.55);
+      z-index: 10;
     }
-    #apiKeyModelContent {
-      background: #fff;
-      padding: 30px;
-      border-radius: 12px;
-      width: 90%;
-      max-width: 400px;
-      text-align: center;
-      box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+
+    .modal__content {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      width: min(420px, 100%);
+      padding: 32px 30px;
       display: flex;
       flex-direction: column;
-      align-items: center;
+      gap: 20px;
+      text-align: center;
     }
-    #apiKeyInput {
-      width: 80%;
-      padding: 10px;
-      margin: 20px 0;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-      font-size: 1em;
+
+    .modal__title {
+      font-size: 1.4rem;
     }
-    hr {
-      margin: 25px 0;
-      border: none;
-      border-top: 2px solid #e0e0e0;
+
+    .modal__hint {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    .modal__actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: 100%;
+      margin-top: 10px;
+    }
+
+    .modal__actions .button {
+      width: 100%;
+      height: 48px;
+      border-radius: 12px;
+      font-size: 1rem;
+    }
+
+    .modal__actions .button--ghost {
+      border-color: transparent;
+      background: rgba(148, 163, 184, 0.12);
+      color: var(--text-muted);
+    }
+
+    .modal__actions .button--ghost:hover {
+      color: var(--text);
+      background: rgba(148, 163, 184, 0.2);
+    }
+
+    @media (max-width: 540px) {
+      .page {
+        padding: 0 18px;
+      }
+
+      .surface {
+        padding: 20px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .button {
+        transition: none;
+      }
+
+      select:focus,
+      input[type="password"]:focus {
+        box-shadow: none;
+      }
     }
   </style>
 </head>
 <body>
-  <h1>HAL Web Demo</h1>
-  
-  <!-- API Key Modal -->
-  <div id="apiKeyModel">
-    <div id="apiKeyModelContent">
-      <h2>Enter API Key</h2>
-      <input type="password" id="apiKeyInput" placeholder="API Key" />
-      <button id="submitApiKeyBtn">Submit</button>
-    </div>
-  </div>
-  
-  <div id="mainContent">
-    <!-- Video Preview & Keypoints Overlay Panel -->
-    <div class="panel" id="resultsPanel">
-      <h3>Live Video Preview</h3>
-      <div id="videoContainer">
-        <video id="videoPreview" autoplay muted playsinline webkit-playsinline></video>
-        <canvas id="keypointsCanvas"></canvas>
-      </div>
-      <div id="inferenceResults" class="panel-content">
-        <p>No inference data available.</p>
+  <div class="page">
+    <header class="page-header">
+      <h1>HAL Web Demo</h1>
+      <p class="page-subtitle">Upload or debug a video and review inference results in real time.</p>
+    </header>
+
+    <div class="modal" id="apiKeyModel" role="dialog" aria-modal="true" aria-labelledby="apiKeyModalTitle">
+      <div class="modal__content" id="apiKeyModelContent">
+        <h2 class="modal__title" id="apiKeyModalTitle">Enter API Key</h2>
+        <p class="modal__hint">Provide your HAL API key or switch to offline debug mode.</p>
+        <input type="password" id="apiKeyInput" placeholder="API Key" aria-label="API Key" />
+        <div class="modal__actions">
+          <button class="button button--primary" id="submitApiKeyBtn" type="button">Submit</button>
+          <button class="button button--ghost" id="offlineModeBtn" type="button">Offline Debug Mode</button>
+        </div>
       </div>
     </div>
-    
-    <hr />
-    
-    <!-- Action Buttons (Record, Select, Debug) -->
-    <div class="action-buttons">
-      <!-- Record Button triggers captureInput -->
-      <button id="recordBtn">Capture</button>
-      <input type="file" id="captureInput" accept="video/*" capture="environment" />
 
-      <!-- Select File Button triggers fileSelectInput -->
-      <button id="selectBtn">Select File</button>
-      <input type="file" id="fileSelectInput" accept="video/*" />
+    <main class="layout" aria-live="polite">
+      <section class="surface" id="resultsPanel" aria-labelledby="videoPanelTitle">
+        <div class="surface__header">
+          <h2 id="videoPanelTitle">Live Video Preview</h2>
+          <p class="surface__description">Video playback updates automatically when inference data arrives.</p>
+        </div>
+        <div id="videoContainer" class="media">
+          <video id="videoPreview" autoplay muted playsinline webkit-playsinline></video>
+          <canvas id="keypointsCanvas"></canvas>
+        </div>
+        <div id="inferenceResults" class="callout callout--results">
+          <div class="result-placeholder">No inference data available.</div>
+        </div>
+      </section>
 
-      <!-- Debug Button -->
-      <button id="debugBtn" disabled>Debug Test</button>
-    </div>
-    
-    <!-- New Dropdown for API Version selection -->
-    <div class="action-buttons">
-      <select id="versionSelect">
-        <option value="0.5.1" selected>0.5.1</option>
-        <option value="0.5.0">0.5.0</option>
-        <option value="0.4.3">0.4.3</option>
-        <option value="0.4.2">0.4.2</option>
-        <option value="0.4.1">0.4.1</option>
-        <option value="0.4.0">0.4.0</option>
-        <option value="0.3.3">0.3.3</option>
-      </select>
-      <button id="uploadBtn" disabled>Upload to AWS</button>
-    </div>
+      <section class="surface surface--workflow" aria-labelledby="workflowTitle">
+        <div class="surface__header">
+          <h2 id="workflowTitle">Workflow</h2>
+          <p class="surface__description">Select a video, run a debug pass, or push to AWS for full inference.</p>
+        </div>
+        <div class="workflow-actions">
+          <div class="workflow-actions__primary">
+            <button id="selectBtn" class="button button--primary" type="button">Select Video</button>
+            <button id="uploadBtn" class="button button--primary" type="button" disabled>Upload to AWS</button>
+          </div>
+          <div class="workflow-actions__secondary">
+            <button id="debugBtn" class="button button--ghost" type="button" disabled>Debug Test</button>
+          </div>
+          <input type="file" id="fileSelectInput" accept="video/*" />
+        </div>
+        <label class="select-wrapper visually-hidden">
+          <span class="select-label">API Version</span>
+          <select id="versionSelect" aria-describedby="modelStatusList"></select>
+        </label>
+        <div id="modelStatusList" class="model-status" aria-live="polite" role="radiogroup" aria-label="Available models"></div>
+        <div class="status-grid">
+          <div class="status-block" id="uploadPanel">
+            <h3>Upload</h3>
+            <p id="uploadMessage" class="status-copy">Waiting for video...</p>
+          </div>
+          <div class="status-block" id="statusPanel">
+            <h3>Status</h3>
+            <p id="statusMessage" class="status-copy">No updates yet.</p>
+          </div>
+          <div class="status-block" id="downloadPanel">
+            <h3>Download</h3>
+            <p id="downloadMessage" class="status-copy">Waiting...</p>
+          </div>
+        </div>
+      </section>
+    </main>
 
-    <!-- Status Panels -->
-    <div class="panel" id="uploadPanel">
-      <h3>Upload Status</h3>
-      <div id="uploadMessage" class="panel-content">Waiting for video...</div>
-    </div>
-    <div class="panel" id="statusPanel">
-      <h3>Processing Status</h3>
-      <div id="statusMessage" class="panel-content">No updates yet.</div>
-    </div>
-    <div class="panel" id="downloadPanel">
-      <h3>Download Status</h3>
-      <div id="downloadMessage" class="panel-content">Waiting...</div>
-    </div>
-  </div>
-  
-  <!-- API Logs -->
-  <div id="apiLogs">
-    <h3>Live API Logs</h3>
-    <pre id="logsContent">Logs will appear here...</pre>
+    <section class="surface surface--logs" id="apiLogs" aria-labelledby="logsTitle">
+      <div class="surface__header">
+        <h2 id="logsTitle">Live API Logs</h2>
+      </div>
+      <pre id="logsContent">Logs will appear here...</pre>
+    </section>
   </div>
 
   <script>
-    /***** Global Variables & DOM Elements *****/
-    const API_VERSION = '0.4.1';
+    /* ------------------------------------------------------------------------
+       App State & Configuration
+    ------------------------------------------------------------------------ */
+    const API_BASE_URL = 'https://ue7v1pazxb.execute-api.us-west-2.amazonaws.com';
+    const OFFLINE_MODE_KEY = '__HAL_OFFLINE_DEBUG__';
+    const DEFAULT_ENDPOINTS = [
+      { version: '0.5.1', endpoint_status: 'Offline', num_endpoint_instances: 0 },
+      { version: '0.4.3', endpoint_status: 'Offline', num_endpoint_instances: 0 },
+      { version: '0.4.2', endpoint_status: 'Offline', num_endpoint_instances: 0 },
+      { version: '0.3.3', endpoint_status: 'Offline', num_endpoint_instances: 0 }
+    ];
+
     let API_KEY = null;
     let selectedVideoBlob = null;
     let poseData = {};
     let poseKeys = [];
-    let frameRate = 30; // Assumed frame rate
+    let frameRate = 30;
+    let isRenderLoopAttached = false;
+    let lastDrawnFrame = null;
+    let poseKeysMissingLogged = false;
+    let poseFrameMissingLogged = false;
+    let availableModels = [];
 
-    // Modal
+    /* ------------------------------------------------------------------------
+       DOM References
+    ------------------------------------------------------------------------ */
     const apiKeyModel = document.getElementById('apiKeyModel');
     const apiKeyInput = document.getElementById('apiKeyInput');
     const submitApiKeyBtn = document.getElementById('submitApiKeyBtn');
+    const offlineModeBtn = document.getElementById('offlineModeBtn');
 
-    // Video elements
     const videoPreview = document.getElementById('videoPreview');
     const keypointsCanvas = document.getElementById('keypointsCanvas');
 
-    // Hidden file inputs
-    const captureInput = document.getElementById('captureInput');
     const fileSelectInput = document.getElementById('fileSelectInput');
 
-    // Buttons
-    const recordBtn = document.getElementById('recordBtn');
     const selectBtn = document.getElementById('selectBtn');
     const debugBtn = document.getElementById('debugBtn');
     const uploadBtn = document.getElementById('uploadBtn');
-    // Dropdown
     const versionSelect = document.getElementById('versionSelect');
 
-    // Status messages  
     const uploadMessage = document.getElementById('uploadMessage');
     const statusMessage = document.getElementById('statusMessage');
     const downloadMessage = document.getElementById('downloadMessage');
     const inferenceResults = document.getElementById('inferenceResults');
     const logsContent = document.getElementById('logsContent');
+    const modelStatusList = document.getElementById('modelStatusList');
 
-    /** Utility: Log to panel **/
+    /* ------------------------------------------------------------------------
+       UI Helpers
+    ------------------------------------------------------------------------ */
+    function showInferencePlaceholder(message = 'No inference data yet.') {
+      inferenceResults.innerHTML = `<div class="result-placeholder">${message}</div>`;
+    }
+
+    function setActionAvailability({ select, debug, upload } = {}) {
+      if (typeof select === 'boolean') {
+        selectBtn.disabled = !select;
+      }
+      if (typeof debug === 'boolean') {
+        debugBtn.disabled = !debug;
+      }
+      if (typeof upload === 'boolean') {
+        uploadBtn.disabled = !upload;
+      }
+    }
+
+    function refreshActionAvailability() {
+      setActionAvailability({
+        select: true,
+        debug: Boolean(selectedVideoBlob),
+        upload: Boolean(selectedVideoBlob) && API_KEY !== OFFLINE_MODE_KEY
+      });
+    }
+
     function logToAPI(message) {
       const timestamp = new Date().toLocaleTimeString();
       logsContent.textContent += `[${timestamp}] ${message}\n`;
@@ -294,90 +752,255 @@
       console.log(`[${timestamp}] ${message}`);
     }
 
-    /** Handle API Key submission **/
-    submitApiKeyBtn.onclick = () => {
+    function populateVersionSelect(endpoints, { offline = false } = {}) {
+      if (!Array.isArray(endpoints) || endpoints.length === 0) {
+        availableModels = [];
+        versionSelect.innerHTML = '';
+        versionSelect.disabled = true;
+        renderModelStatus([], { offline });
+        return null;
+      }
+
+      availableModels = endpoints.map((endpoint) => ({
+        version: endpoint.version,
+        status: offline ? 'Offline' : endpoint.endpoint_status || 'Unknown',
+        instances: offline ? 0 : Number(endpoint.num_endpoint_instances) || 0,
+        endpointName: endpoint.endpoint_name || '',
+        offline
+      }));
+
+      versionSelect.innerHTML = '';
+      availableModels.forEach((model) => {
+        const option = document.createElement('option');
+        option.value = model.version;
+        option.textContent = model.version;
+        versionSelect.appendChild(option);
+      });
+
+      versionSelect.disabled = false;
+      const preferred = availableModels.find((model) => !model.offline && model.status === 'InService' && model.instances > 0) || availableModels[0];
+
+      if (preferred) {
+        setSelectedVersion(preferred.version, { programmatic: true });
+        return preferred.version;
+      }
+
+      renderModelStatus(availableModels, { offline });
+      return null;
+    }
+
+    function renderModelStatus(models, { offline = false, loading = false } = {}) {
+      if (loading) {
+        modelStatusList.innerHTML = '<div class="model-status__placeholder">Loading available models...</div>';
+        return;
+      }
+
+      if (!models.length) {
+        modelStatusList.innerHTML = '<div class="model-status__placeholder">No models available.</div>';
+        return;
+      }
+
+      const currentValue = versionSelect.value;
+      const offlineMode = offline || models.every((model) => model.offline);
+
+      modelStatusList.innerHTML = models.map((model) => {
+        const isSelected = model.version === currentValue;
+        const hasInstances = !offlineMode && model.status === 'InService' && model.instances > 0;
+        const indicatorClass = hasInstances ? 'status-indicator status-indicator--online' : 'status-indicator status-indicator--offline';
+        const metaLabel = offlineMode
+          ? 'Debug mode only'
+          : hasInstances
+            ? formatInstanceLabel(model.instances)
+            : 'No active instances';
+        const statusSuffix = offlineMode ? '' : model.status ? ` · ${model.status}` : '';
+        const ariaStatus = offlineMode ? 'offline mode' : (model.status || 'status unknown');
+        const ariaMeta = offlineMode
+          ? 'Debug mode only'
+          : hasInstances
+            ? `${model.instances} active ${model.instances === 1 ? 'instance' : 'instances'}`
+            : 'No active instances';
+        const ariaLabel = `${model.version}: ${ariaMeta}, ${ariaStatus}`;
+
+        return `
+          <button
+            type="button"
+            class="model-status__item"
+            data-version="${model.version}"
+            role="radio"
+            aria-checked="${isSelected}"
+            tabindex="${isSelected ? '0' : '-1'}"
+            aria-label="${ariaLabel}"
+          >
+            <span class="model-status__main">
+              <span class="${indicatorClass}" aria-hidden="true"></span>
+              <span>${model.version}</span>
+            </span>
+            <span class="model-status__meta">${metaLabel}${statusSuffix}</span>
+          </button>
+        `.trim();
+      }).join('');
+    }
+
+    function formatInstanceLabel(count) {
+      if (!Number.isFinite(count) || count <= 0) {
+        return 'No active instances';
+      }
+      return `${count} active ${count === 1 ? 'instance' : 'instances'}`;
+    }
+
+    function setSelectedVersion(version, { programmatic = false } = {}) {
+      if (!version || !availableModels.length) {
+        return;
+      }
+
+      const optionExists = Array.from(versionSelect.options).some((option) => option.value === version);
+      if (!optionExists) {
+        return;
+      }
+
+      const previousValue = versionSelect.value;
+      if (previousValue !== version) {
+        versionSelect.value = version;
+      }
+
+      handleVersionChange();
+
+      if (!programmatic) {
+        requestAnimationFrame(() => {
+          const nextItem = modelStatusList.querySelector(`.model-status__item[data-version="${version}"]`);
+          if (nextItem) {
+            nextItem.focus();
+          }
+        });
+      }
+    }
+
+    showInferencePlaceholder('No inference data available.');
+    setActionAvailability({ select: false, debug: false, upload: false });
+    populateVersionSelect(DEFAULT_ENDPOINTS, { offline: true });
+
+    /* ------------------------------------------------------------------------
+       Event Wiring
+    ------------------------------------------------------------------------ */
+    submitApiKeyBtn.addEventListener('click', handleApiKeySubmit);
+    offlineModeBtn.addEventListener('click', enableOfflineMode);
+    selectBtn.addEventListener('click', () => fileSelectInput.click());
+    fileSelectInput.addEventListener('change', handleFileInputChange);
+    uploadBtn.addEventListener('click', handleUploadClick);
+    debugBtn.addEventListener('click', handleDebugClick);
+    versionSelect.addEventListener('change', () => setSelectedVersion(versionSelect.value, { programmatic: true }));
+    modelStatusList.addEventListener('click', handleModelSelectionClick);
+    modelStatusList.addEventListener('keydown', handleModelStatusKeydown);
+
+    /* ------------------------------------------------------------------------
+       Event Handlers
+    ------------------------------------------------------------------------ */
+    function handleApiKeySubmit() {
       const enteredKey = apiKeyInput.value.trim();
-      if (enteredKey) {
-        API_KEY = enteredKey;
-        apiKeyModel.style.display = 'none';
-        initializeApp();
-      } else {
-        alert('API Key is required to proceed.');
+      if (!enteredKey) {
+        alert('API key is required to proceed.');
+        return;
       }
-    };
 
-    /** Initialize app after API key is set **/
-    function initializeApp() {
-      recordBtn.disabled = false;
-      selectBtn.disabled = false;
-      uploadBtn.disabled = true;
-      debugBtn.disabled = true;
-      uploadMessage.textContent = 'API Key set. Please capture or select a video.';
-      logToAPI('API Key has been set.');
+      API_KEY = enteredKey;
+      apiKeyModel.style.display = 'none';
+      initializeApp(false);
     }
 
-    /** RECORD BUTTON: triggers the hidden captureInput **/
-    recordBtn.onclick = () => {
-      captureInput.click();
-    };
+    function enableOfflineMode() {
+      API_KEY = OFFLINE_MODE_KEY;
+      apiKeyModel.style.display = 'none';
+      initializeApp(true);
+    }
 
-    /** SELECT FILE BUTTON: triggers the hidden fileSelectInput **/
-    selectBtn.onclick = () => {
-      fileSelectInput.click();
-    };
-
-    /** Common handler for capturing or selecting a file */
-    function handleFileSelection(file) {
+    function handleFileInputChange(event) {
+      const [file] = event.target.files || [];
       if (file) {
-        selectedVideoBlob = file;
-        uploadMessage.textContent = `Selected: ${file.name} (${file.size} bytes). Ready for upload or debug.`;
-        statusMessage.textContent = 'Video file selected.';
-        downloadMessage.textContent = 'Waiting...';
-        inferenceResults.innerHTML = '<p>No inference data available.</p>';
-        logToAPI(`Video selected: ${file.name}`);
-
-        // Display video
-        const videoURL = URL.createObjectURL(file);
-        videoPreview.srcObject = null;
-        videoPreview.src = videoURL;
-        videoPreview.controls = true;
-        videoPreview.play();
-        videoPreview.onloadedmetadata = () => {
-          keypointsCanvas.width = videoPreview.videoWidth;
-          keypointsCanvas.height = videoPreview.videoHeight;
-        };
-
-        // Enable subsequent actions
-        uploadBtn.disabled = false;
-        debugBtn.disabled = false;
+        handleFileSelection(file);
+        fileSelectInput.value = '';
       }
     }
 
-    /** Listen for changes on both hidden inputs */
-    captureInput.onchange = (e) => {
-      if (captureInput.files && captureInput.files.length > 0) {
-        handleFileSelection(captureInput.files[0]);
+    function handleModelSelectionClick(event) {
+      const target = event.target.closest('.model-status__item');
+      if (!target || !modelStatusList.contains(target) || target.hasAttribute('disabled')) {
+        return;
       }
-    };
-    fileSelectInput.onchange = (e) => {
-      if (fileSelectInput.files && fileSelectInput.files.length > 0) {
-        handleFileSelection(fileSelectInput.files[0]);
-      }
-    };
 
-    /** Upload Flow: Upload video to AWS and poll for processing **/
-    uploadBtn.onclick = async () => {
+      const { version } = target.dataset;
+      if (version) {
+        setSelectedVersion(version);
+      }
+    }
+
+    function handleModelStatusKeydown(event) {
+      if (!event.target.classList.contains('model-status__item')) {
+        return;
+      }
+
+      const actionableKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End'];
+      if (!actionableKeys.includes(event.key)) {
+        return;
+      }
+
+      const items = Array.from(modelStatusList.querySelectorAll('.model-status__item'));
+      if (items.length === 0) {
+        return;
+      }
+
+      const currentIndex = items.findIndex((item) => item.dataset.version === event.target.dataset.version);
+      if (currentIndex === -1) {
+        return;
+      }
+
+      event.preventDefault();
+
+      let nextIndex = currentIndex;
+      switch (event.key) {
+        case 'ArrowUp':
+        case 'ArrowLeft':
+          nextIndex = currentIndex === 0 ? items.length - 1 : currentIndex - 1;
+          break;
+        case 'ArrowDown':
+        case 'ArrowRight':
+          nextIndex = currentIndex === items.length - 1 ? 0 : currentIndex + 1;
+          break;
+        case 'Home':
+          nextIndex = 0;
+          break;
+        case 'End':
+          nextIndex = items.length - 1;
+          break;
+        default:
+          break;
+      }
+
+      const nextItem = items[nextIndex];
+      if (nextItem && nextItem.dataset.version) {
+        setSelectedVersion(nextItem.dataset.version);
+      }
+    }
+
+    function handleVersionChange() {
+      if (!availableModels.length) {
+        return;
+      }
+      const offlineMode = API_KEY === OFFLINE_MODE_KEY || availableModels.every((model) => model.offline);
+      renderModelStatus(availableModels, { offline: offlineMode });
+    }
+
+    async function handleUploadClick() {
       if (!selectedVideoBlob) {
         uploadMessage.textContent = 'No video selected!';
         logToAPI('Upload attempted without a video.');
         return;
       }
-      uploadBtn.disabled = true;
-      debugBtn.disabled = true;
+
+      setActionAvailability({ select: false, debug: false, upload: false });
       uploadMessage.textContent = 'Starting upload process...';
       statusMessage.textContent = 'Upload initiated.';
-      downloadMessage.textContent = 'Waiting...';
-      inferenceResults.innerHTML = '<p>No inference data available.</p>';
+      downloadMessage.textContent = 'Waiting for processing...';
+      showInferencePlaceholder('Waiting for inference results...');
       logToAPI('Upload process started.');
 
       const timestamp = new Date().toISOString().replace(/[-:.TZ]/g, '');
@@ -385,9 +1008,9 @@
       logToAPI(`Uploading video as: ${videoName}`);
 
       try {
-        // GET upload endpoint
-        const uploadEndpoint = `https://ue7v1pazxb.execute-api.us-west-2.amazonaws.com/upload/dev/${encodeURIComponent(videoName)}`;
+        const uploadEndpoint = `${API_BASE_URL}/upload/dev/${encodeURIComponent(videoName)}`;
         logToAPI(`Requesting upload URL: ${uploadEndpoint}`);
+
         const uploadResponse = await fetch(uploadEndpoint, {
           method: 'GET',
           headers: {
@@ -395,103 +1018,284 @@
             'x-api-key': API_KEY
           }
         });
+
         if (!uploadResponse.ok) {
           throw new Error(`Upload request failed: ${uploadResponse.status} ${uploadResponse.statusText}`);
         }
-        const uploadData = await uploadResponse.json();
-        const { guid, presigned_url } = uploadData;
-        logToAPI(`Upload details: GUID=${guid}, URL=${presigned_url}`);
-        uploadMessage.textContent = `GUID: ${guid} - Preparing upload...`;
 
-        // PUT video to AWS
+        const uploadData = await uploadResponse.json();
+        const { guid, presigned_url: presignedUrl } = uploadData;
+        logToAPI(`Upload details: GUID=${guid}, URL=${presignedUrl}`);
+        uploadMessage.textContent = `GUID: ${guid} — Preparing upload...`;
+
         uploadMessage.textContent += '\nUploading video...';
-        logToAPI(`Uploading video to: ${presigned_url}`);
-        const putResponse = await fetch(presigned_url, {
+        logToAPI(`Uploading video to: ${presignedUrl}`);
+        const putResponse = await fetch(presignedUrl, {
           method: 'PUT',
           headers: { 'Content-Type': 'video/mp4' },
           body: selectedVideoBlob
         });
+
         if (!putResponse.ok) {
           throw new Error(`Upload failed: ${putResponse.status} ${putResponse.statusText}`);
         }
+
         uploadMessage.textContent += '\nUpload successful!';
         logToAPI('Video uploaded to AWS.');
 
-        // Start polling for processing
         statusMessage.textContent = 'Video uploaded. Processing started.';
         logToAPI('Starting status polling.');
         pollStatus(guid);
       } catch (error) {
         uploadMessage.textContent += `\nError: ${error.message}`;
         logToAPI(`Upload error: ${error.message}`);
-        uploadBtn.disabled = false;
-        debugBtn.disabled = false;
+        refreshActionAvailability();
       }
-    };
+    }
 
-    /** Poll for processing status **/
-    async function pollStatus(guid) {
+    function handleDebugClick() {
+      if (!selectedVideoBlob) {
+        alert('Please select a video first.');
+        return;
+      }
+
+      setActionAvailability({ select: false, debug: false, upload: false });
+      logToAPI('Debug test triggered.');
+      uploadMessage.textContent = 'Debug test initiated. Skipping upload...';
+      statusMessage.textContent = 'Simulating processing...';
+      downloadMessage.textContent = 'Fetching debug results...';
+      showInferencePlaceholder('Waiting for debug results...');
+
+      const debugJson = {
+        version: versionSelect.value,
+        status: 'success',
+        message: 'Debug inference completed successfully',
+        warnings: [],
+        fps: 30.0,
+        total_frames: 20,
+        subjects: [
+          {
+            subject_id: 0,
+            track_id: 1,
+            left_prediction: 3,
+            left_confidence: 0.74,
+            right_prediction: 2,
+            right_confidence: 0.78,
+            track_length: 20,
+            pose_keys: [
+              'Box_X1','Box_Y1','Box_X2','Box_Y2',
+              'X_left_shoulder','Y_left_shoulder',
+              'X_right_shoulder','Y_right_shoulder',
+              'X_left_elbow','Y_left_elbow',
+              'X_right_elbow','Y_right_elbow',
+              'X_left_wrist','Y_left_wrist',
+              'X_right_wrist','Y_right_wrist'
+            ],
+            pose_df: {
+              '0': [88, 212, 276, 701, 234, 299, 163, 290, 226, 377, 127, 336, 143, 409, 102, 351],
+              '1': [87, 211, 276, 700, 233, 298, 162, 290, 226, 375, 126, 337, 143, 407, 102, 350],
+              '2': [87, 210, 275, 699, 231, 297, 161, 290, 226, 374, 125, 337, 142, 406, 101, 350],
+              '3': [86, 210, 274, 698, 230, 296, 160, 289, 225, 372, 124, 338, 142, 404, 101, 349],
+              '4': [86, 209, 274, 697, 228, 295, 159, 289, 225, 371, 123, 338, 142, 403, 101, 348],
+              '5': [86, 209, 273, 696, 227, 295, 158, 289, 224, 370, 123, 338, 142, 402, 100, 348],
+              '6': [86, 208, 273, 696, 227, 294, 157, 289, 224, 370, 122, 339, 142, 401, 100, 347],
+              '7': [86, 208, 272, 695, 226, 294, 157, 289, 223, 370, 122, 339, 142, 401, 100, 347],
+              '8': [86, 209, 272, 694, 225, 294, 156, 289, 223, 369, 122, 340, 142, 400, 100, 347],
+              '9': [87, 209, 271, 694, 225, 294, 156, 290, 223, 369, 123, 340, 142, 400, 100, 346],
+              '10': [87, 209, 271, 694, 224, 294, 156, 290, 222, 369, 123, 341, 142, 400, 100, 346],
+              '11': [88, 210, 270, 693, 223, 294, 156, 290, 222, 369, 123, 341, 142, 399, 100, 346],
+              '12': [88, 211, 270, 693, 222, 295, 156, 291, 221, 369, 123, 341, 142, 399, 101, 346],
+              '13': [88, 212, 269, 692, 221, 295, 156, 292, 221, 369, 124, 342, 141, 399, 101, 345],
+              '14': [87, 212, 268, 691, 220, 295, 156, 292, 221, 368, 124, 343, 141, 399, 101, 345],
+              '15': [87, 213, 267, 690, 219, 294, 155, 293, 220, 368, 124, 344, 141, 399, 102, 345],
+              '16': [86, 213, 266, 688, 218, 294, 155, 293, 220, 368, 124, 345, 141, 399, 102, 346],
+              '17': [86, 213, 265, 686, 218, 294, 154, 293, 220, 368, 125, 346, 141, 399, 103, 346],
+              '18': [85, 213, 264, 684, 217, 293, 154, 293, 220, 367, 125, 347, 141, 400, 103, 346],
+              '19': [85, 213, 264, 683, 216, 293, 154, 293, 220, 367, 125, 347, 141, 400, 104, 347]
+            }
+          }
+        ]
+      };
+
+      setTimeout(() => {
+        applyInferenceResult(debugJson, 'Debug');
+      }, 1000);
+    }
+
+    /* ------------------------------------------------------------------------
+       Initialization & API helpers
+    ------------------------------------------------------------------------ */
+    function initializeApp(isOffline) {
+      selectedVideoBlob = null;
+      poseData = {};
+      poseKeys = [];
+      frameRate = 30;
+      availableModels = [];
+
+      videoPreview.pause();
+      videoPreview.removeAttribute('src');
+      videoPreview.load();
+      keypointsCanvas.getContext('2d').clearRect(0, 0, keypointsCanvas.width, keypointsCanvas.height);
+
+      refreshActionAvailability();
+
+      if (isOffline) {
+        populateVersionSelect(DEFAULT_ENDPOINTS, { offline: true });
+        uploadMessage.textContent = 'Offline debug mode. Select a video to test locally.';
+        logToAPI('Offline debug mode enabled. Uploads to AWS are disabled.');
+        versionSelect.disabled = false;
+      } else {
+        versionSelect.disabled = true;
+        versionSelect.innerHTML = '';
+        renderModelStatus([], { loading: true });
+        uploadMessage.textContent = 'API key saved. Select a video to begin.';
+        logToAPI('API key set. Fetching available versions...');
+        fetchHealthStatus();
+      }
+
+      statusMessage.textContent = 'No updates yet.';
+      downloadMessage.textContent = 'Waiting...';
+      showInferencePlaceholder('Select a video to get started.');
+    }
+
+    async function fetchHealthStatus() {
+      if (API_KEY === OFFLINE_MODE_KEY) {
+        uploadMessage.textContent = 'Offline mode: uploads are disabled. Switch to online mode with an API key to upload.';
+        logToAPI('Upload blocked: offline mode active.');
+        return;
+      }
+
+      const healthEndpoint = `${API_BASE_URL}/health`;
+      renderModelStatus([], { loading: true });
+      versionSelect.disabled = true;
+
+      try {
+        const res = await fetch(healthEndpoint, {
+          headers: { 'x-api-key': API_KEY }
+        });
+
+        if (!res.ok) {
+          throw new Error(`Health request failed: ${res.status} ${res.statusText}`);
+        }
+
+        const healthData = await res.json();
+        const endpoints = Array.isArray(healthData.endpoints) ? healthData.endpoints : [];
+        const inService = endpoints.filter((endpoint) => endpoint.endpoint_status === 'InService');
+        const candidates = inService.length > 0 ? inService : endpoints;
+
+        if (candidates.length === 0) {
+          availableModels = [];
+          versionSelect.innerHTML = '';
+          renderModelStatus([], { offline: false });
+          versionSelect.disabled = true;
+          logToAPI('Health check returned no available endpoints.');
+          return;
+        }
+
+        candidates.sort((a, b) => b.version.localeCompare(a.version, undefined, { numeric: true, sensitivity: 'base' }));
+        const defaultVersion = populateVersionSelect(candidates, { offline: false });
+        const versionsList = availableModels.map((model) => model.version).join(', ');
+        const message = defaultVersion
+          ? `Available versions: ${versionsList}. Defaulting to ${defaultVersion}.`
+          : `Available versions: ${versionsList}.`;
+        logToAPI(message);
+      } catch (error) {
+        logToAPI(`Health check error: ${error.message}`);
+        renderModelStatus(availableModels, { offline: API_KEY === OFFLINE_MODE_KEY });
+        versionSelect.disabled = availableModels.length === 0;
+      }
+    }
+
+    function handleFileSelection(file) {
+      selectedVideoBlob = file;
+      uploadMessage.textContent = `Selected: ${file.name} (${file.size} bytes). Ready for upload or debug.`;
+      statusMessage.textContent = 'Video file selected.';
+      downloadMessage.textContent = 'Waiting...';
+      showInferencePlaceholder('Awaiting inference results.');
+      logToAPI(`Video selected: ${file.name}`);
+
+      const videoURL = URL.createObjectURL(file);
+      videoPreview.srcObject = null;
+      videoPreview.src = videoURL;
+      videoPreview.controls = true;
+      videoPreview.onloadedmetadata = () => {
+        keypointsCanvas.width = videoPreview.videoWidth;
+        keypointsCanvas.height = videoPreview.videoHeight;
+        logToAPI(`Video metadata loaded: ${videoPreview.videoWidth}x${videoPreview.videoHeight}, duration ${videoPreview.duration.toFixed(2)}s.`);
+      };
+
+      refreshActionAvailability();
+
+      if (API_KEY === OFFLINE_MODE_KEY) {
+        uploadMessage.textContent += '\nOffline mode: Upload button remains disabled.';
+      }
+    }
+
+    /* ------------------------------------------------------------------------
+       Upload & Polling Flow
+    ------------------------------------------------------------------------ */
+    function pollStatus(guid) {
       let pollCount = 0;
       const maxPolls = 60;
-      const intervalTime = 30000; // 30 seconds
+      const intervalTime = 30000;
       logToAPI(`Polling status for GUID: ${guid}`);
 
-      const interval = setInterval(async () => {
-        pollCount++;
+      const pollTimer = setInterval(async () => {
+        pollCount += 1;
         logToAPI(`Polling attempt #${pollCount}`);
         statusMessage.textContent = `Status check #${pollCount}...`;
 
         try {
-          const statusEndpoint = `https://ue7v1pazxb.execute-api.us-west-2.amazonaws.com/status/dev/${encodeURIComponent(guid)}`;
+          const statusEndpoint = `${API_BASE_URL}/status/dev/${encodeURIComponent(guid)}`;
           const statusRes = await fetch(statusEndpoint, {
             method: 'GET',
             headers: { 'x-api-key': API_KEY }
           });
+
           if (!statusRes.ok) {
             throw new Error(`Status error: ${statusRes.status} ${statusRes.statusText}`);
           }
+
           const statusData = await statusRes.json();
           logToAPI(`Status: ${JSON.stringify(statusData)}`);
           statusMessage.textContent = `Current Status: ${statusData.status}`;
 
           if (statusData.status === 'done') {
-            clearInterval(interval);
-            statusMessage.textContent += ' - Processing complete.';
+            clearInterval(pollTimer);
+            statusMessage.textContent += ' — Processing complete.';
             downloadMessage.textContent = 'Fetching final results...';
             logToAPI('Processing complete. Fetching results.');
             fetchFinalResults(guid);
           } else if (pollCount >= maxPolls) {
-            clearInterval(interval);
-            statusMessage.textContent += ' - Max polling attempts reached.';
+            clearInterval(pollTimer);
+            statusMessage.textContent += ' — Max polling attempts reached.';
             downloadMessage.textContent = 'Processing timed out.';
             logToAPI('Max polling reached.');
-            uploadBtn.disabled = false;
-            debugBtn.disabled = false;
+            refreshActionAvailability();
           }
-        } catch (err) {
-          statusMessage.textContent = `Error: ${err.message}`;
-          logToAPI(`Polling error: ${err.message}`);
-          clearInterval(interval);
-          uploadBtn.disabled = false;
-          debugBtn.disabled = false;
+        } catch (error) {
+          statusMessage.textContent = `Error: ${error.message}`;
+          logToAPI(`Polling error: ${error.message}`);
+          clearInterval(pollTimer);
+          refreshActionAvailability();
         }
       }, intervalTime);
     }
 
-    /** Fetch final results and display them **/
     async function fetchFinalResults(guid) {
       try {
-        const downloadEndpoint = `https://ue7v1pazxb.execute-api.us-west-2.amazonaws.com/download/dev/${encodeURIComponent(guid)}`;
+        const downloadEndpoint = `${API_BASE_URL}/download/dev/${encodeURIComponent(guid)}`;
         logToAPI(`Fetching download URL: ${downloadEndpoint}`);
+
         const downloadRes = await fetch(downloadEndpoint, {
           method: 'GET',
-          headers: {
-            'x-api-key': API_KEY
-          }
+          headers: { 'x-api-key': API_KEY }
         });
+
         if (!downloadRes.ok) {
           throw new Error(`Download request failed: ${downloadRes.status} ${downloadRes.statusText}`);
         }
+
         const downloadData = await downloadRes.json();
         const finalUrl = downloadData.presigned_url;
         logToAPI(`Final download URL: ${finalUrl}`);
@@ -501,154 +1305,164 @@
         if (!finalRes.ok) {
           throw new Error(`Final JSON fetch failed: ${finalRes.status} ${finalRes.statusText}`);
         }
+
         const finalJson = await finalRes.json();
-        logToAPI(`Final JSON: ${JSON.stringify(finalJson)}`);
-
-        poseData = finalJson.pose_df || {};
-        poseKeys = finalJson.pose_keys || [];
-
-        const { right_prediction, right_confidence, left_prediction, left_confidence } = finalJson;
-        downloadMessage.textContent += `\nRight: HAL=${right_prediction} (${(right_confidence*100).toFixed(0)}%)\nLeft: HAL=${left_prediction} (${(left_confidence*100).toFixed(0)}%)`;
-        inferenceResults.innerHTML = `
-          <hr>
-          <div style="font-size:1.5em; font-weight:bold;">
-            <span style="color:#28a745;">Right Prediction: ${right_prediction}</span> &nbsp;&nbsp;
-            <span style="color:#17a2b8;">Left Prediction: ${left_prediction}</span>
-          </div>
-          <div style="margin-top:10px; font-size:1.2em;">
-            <span>Right Confidence: ${(right_confidence*100).toFixed(0)}%</span> &nbsp;&nbsp;
-            <span>Left Confidence: ${(left_confidence*100).toFixed(0)}%</span>
-          </div>
-        `;
-        logToAPI('Final results displayed.');
-        setupCanvasRendering();
-        // If the video is already playing, immediately start the render loop.
-        if (videoPreview.paused || videoPreview.ended) {
-          videoPreview.play();
-        }
+        logToAPI(`Final payload received. version=${finalJson.version || 'n/a'}, status=${finalJson.status || 'n/a'}`);
+        applyInferenceResult(finalJson, 'Inference');
       } catch (error) {
         downloadMessage.textContent = `Error: ${error.message}`;
         logToAPI(`Download error: ${error.message}`);
+        refreshActionAvailability();
       }
     }
 
-    /** Debug Mode: Skip upload and simulate a JSON response **/
-    debugBtn.onclick = () => {
-      if (!selectedVideoBlob) {
-        alert('Please capture or select a video first.');
+    /* ------------------------------------------------------------------------
+       Result Application & Rendering
+    ------------------------------------------------------------------------ */
+    function applyInferenceResult(finalJson, contextLabel) {
+      const label = contextLabel || 'Inference';
+
+      if (!finalJson || typeof finalJson !== 'object') {
+        downloadMessage.textContent = `${label} results unavailable.`;
+        logToAPI(`${label} results missing or invalid.`);
+        refreshActionAvailability();
         return;
       }
-      logToAPI('Debug test triggered.');
-      uploadMessage.textContent = 'Debug test initiated. Skipping upload...';
-      statusMessage.textContent = 'Simulating processing...';
-      downloadMessage.textContent = 'Fetching debug results...';
 
-      // Sample JSON response for debug mode
-      const debugJson = {
-        "version": "0.4.1",
-        "status": "success",
-        "message": "Debug inference completed successfully",
-        "right_prediction": 2,
-        "right_confidence": 0.78,
-        "left_prediction": 3,
-        "left_confidence": 0.74,
-        "valid_frame_percentage": 50,
-        "pose_keys": [
-          "Box_X1","Box_Y1","Box_X2","Box_Y2",
-          "X_left_shoulder","Y_left_shoulder",
-          "X_right_shoulder","Y_right_shoulder",
-          "X_left_elbow","Y_left_elbow",
-          "X_right_elbow","Y_right_elbow",
-          "X_left_wrist","Y_left_wrist",
-          "X_right_wrist","Y_right_wrist"
-        ],
-        "pose_df": {
-          "10": [320, 6, 978, 678, 870, 42, 545, 10, 895, 295, 390, 140, 700, 365, 480, 340],
-          "11": [320, 6, 978, 678, 2, 42, 545, 10, 4, 295, 390, 140, 700, 365, 480, 340],
-          "12": [320, 6, 978, 678, 870, 42, 545, 10, 895, 295, 390, 140, 3, 365, 480, 340],
-          "13": [320, 6, 978, 678, 870, 42, 545, 10, 4, 295, 390, 140, 700, 365, 480, 340],
-          "14": [320, 6, 978, 678, 870, 42, 545, 10, 895, 295, 390, 140, 700, 365, 480, 340],
-          "15": [320, 6, 978, 2, 870, 42, 545, 10, 895, 295, 390, 140, 700, 365, 480, 340],
-          "16": [320, 6, 978, 678, 870, 42, 545, 10, 895, 295, 390, 140, 700, 365, 480, 340],
-          "17": [320, 6, 978, 678, 870, 42, 545, 10, 4, 295, 390, 140, 700, 365, 480, 340],
-          "18": [320, 6, 978, 678, 870, 42, 545, 10, 895, 2, 390, 140, 700, 365, 480, 340],
-          "19": [320, 6, 978, 678, 870, 42, 545, 10, 895, 295, 390, 140, 700, 365, 480, 340],
-          "20": [310, 8, 960, 690, 855, 48, 530, 10, 910, 299, 385, 130, 705, 370, 460, 310],
-          "21": [272, 7, 963, 715, 859, 50, 521, 10, 917, 298, 384, 120, 712, 372, 389, 250],
-          "22": [286, 8, 964, 715, 858, 48, 527, 10, 917, 297, 382, 122, 713, 369, 410, 275],
-          "23": [300, 8, 968, 701, 861, 46, 533, 10, 909, 297, 384, 128, 707, 368, 440, 299],
-          "24": [314, 7, 972, 687, 864, 44, 538, 10, 900, 296, 386, 134, 702, 366, 469, 323],
-          "25": [320, 6, 978, 678, 870, 42, 545, 10, 895, 295, 390, 140, 700, 365, 480, 340],
-          "26": [320, 6, 978, 678, 870, 42, 545, 10, 895, 295, 390, 140, 700, 365, 480, 340],
-          "27": [320, 6, 978, 678, 870, 42, 545, 10, 895, 295, 390, 140, 2, 365, 480, 340],
-          "28": [320, 6, 978, 678, 2, 42, 545, 10, 895, 295, 390, 140, 700, 365, 480, 340],
-          "29": [320, 6, 978, 678, 870, 42, 545, 10, 895, 295, 390, 140, 700, 365, 480, 340],
-        }
-      };
-     
+      const subject = Array.isArray(finalJson.subjects) && finalJson.subjects.length > 0
+        ? finalJson.subjects[0]
+        : null;
 
-      setTimeout(() => {
-        poseData = debugJson.pose_df || {};
-        poseKeys = debugJson.pose_keys || [];
-        const { right_prediction, right_confidence, left_prediction, left_confidence } = debugJson;
-        downloadMessage.textContent = 'Debug results fetched.';
-        inferenceResults.innerHTML = `
-          <hr>
-          <div style="font-size:1.5em; font-weight:bold;">
-            <span style="color:#28a745;">Right Hand HAL: ${right_prediction}</span> &nbsp;&nbsp;
-            <span style="color:#17a2b8;">Left Hand HAL: ${left_prediction}</span>
+      if (!subject) {
+        downloadMessage.textContent = `${label} results contain no subjects.`;
+        logToAPI(`${label} results missing subject data.`);
+        refreshActionAvailability();
+        return;
+      }
+
+      poseData = subject.pose_df || {};
+      poseKeys = subject.pose_keys || [];
+      frameRate = finalJson.fps || 30;
+
+      lastDrawnFrame = null;
+      poseKeysMissingLogged = false;
+      poseFrameMissingLogged = false;
+
+      const versionUsed = finalJson.version || versionSelect.value || 'n/a';
+      const rightPrediction = subject.right_prediction ?? 'N/A';
+      const rightConfidence = subject.right_confidence;
+      const leftPrediction = subject.left_prediction ?? 'N/A';
+      const leftConfidence = subject.left_confidence;
+
+      const formatConfidence = (value) => (typeof value === 'number' ? `${(value * 100).toFixed(0)}%` : 'N/A');
+
+      downloadMessage.textContent = `${label} results ready (version ${versionUsed}).\nRight: HAL=${rightPrediction} (${formatConfidence(rightConfidence)})\nLeft: HAL=${leftPrediction} (${formatConfidence(leftConfidence)})`;
+
+      if (Array.isArray(finalJson.warnings) && finalJson.warnings.length > 0) {
+        downloadMessage.textContent += `\nWarnings: ${finalJson.warnings.join(' | ')}`;
+      }
+
+      let resultMarkup = `
+        <div class="result-group" role="list">
+          <div class="result-item" data-tone="success" role="listitem">
+            <span class="label">Right Prediction</span>
+            <span class="value">${rightPrediction}</span>
+            <span class="meta">Confidence ${formatConfidence(rightConfidence)}</span>
           </div>
-          <div style="margin-top:5px; font-size:1.2em;">
-            <span>Right Confidence: ${(right_confidence*100).toFixed(0)}%</span> &nbsp;&nbsp;
-            <span>Left Confidence: ${(left_confidence*100).toFixed(0)}%</span>
+          <div class="result-item" data-tone="info" role="listitem">
+            <span class="label">Left Prediction</span>
+            <span class="value">${leftPrediction}</span>
+            <span class="meta">Confidence ${formatConfidence(leftConfidence)}</span>
           </div>
-        `;
-        logToAPI('Debug results displayed.');
-        setupCanvasRendering();
-      }, 1000);
-    };
+        </div>
+      `;
 
-    /** Setup canvas rendering for keypoints overlay **/
+      if (Array.isArray(finalJson.warnings) && finalJson.warnings.length > 0) {
+        resultMarkup += `<div class="result-warning">${finalJson.warnings.join(' • ')}</div>`;
+      }
+
+      inferenceResults.innerHTML = resultMarkup;
+
+      const subjectDescriptor = `subject_id=${subject.subject_id ?? 'n/a'}, track_id=${subject.track_id ?? 'n/a'}`;
+      logToAPI(`${label} results displayed (${subjectDescriptor}, version=${versionUsed}).`);
+
+      setupCanvasRendering();
+
+      if (videoPreview.paused || videoPreview.ended) {
+        videoPreview.play().catch(() => {});
+      }
+
+      refreshActionAvailability();
+    }
+
     function setupCanvasRendering() {
       if (Object.keys(poseData).length === 0) {
         logToAPI('No pose data available for rendering.');
         return;
       }
+
       if (videoPreview.readyState >= 2) {
         keypointsCanvas.width = videoPreview.videoWidth;
         keypointsCanvas.height = videoPreview.videoHeight;
       }
 
-      // Start the render loop when the video plays
-      videoPreview.addEventListener('play', () => {
-        renderLoop();
-      });
-      logToAPI('Keypoints overlay setup complete.');
+      if (!isRenderLoopAttached) {
+        videoPreview.addEventListener('play', renderLoop);
+        videoPreview.addEventListener('seeked', () => {
+          requestAnimationFrame(renderLoop);
+        });
+        isRenderLoopAttached = true;
+        logToAPI('Keypoints overlay setup complete. Render loop attached.');
+      } else {
+        logToAPI('Keypoints overlay data refreshed.');
+      }
 
+      if (!videoPreview.paused && !videoPreview.ended) {
+        requestAnimationFrame(renderLoop);
+      }
     }
-    /** Render loop that draws keypoints at every animation frame **/
+
     function renderLoop() {
       if (videoPreview.paused || videoPreview.ended) {
-        return; // Stop the loop if video is not playing
+        return;
       }
       drawKeypointsOverlay();
       requestAnimationFrame(renderLoop);
     }
-    /** Draw keypoints overlay based on the current frame **/
+
     function drawKeypointsOverlay() {
       const currentTime = videoPreview.currentTime;
       const currentFrame = Math.floor(currentTime * frameRate);
       const ctx = keypointsCanvas.getContext('2d');
       ctx.clearRect(0, 0, keypointsCanvas.width, keypointsCanvas.height);
-      
-      if (poseData.hasOwnProperty(currentFrame)) {
-        const arr = poseData[currentFrame];
-        const frameData = {};
-        poseKeys.forEach((keyName, idx) => {
-          frameData[keyName] = arr[idx];
-        });
-        
-        // Draw bounding box
+
+      if (!poseKeys.length) {
+        if (!poseKeysMissingLogged) {
+          logToAPI('Pose keys unavailable; skipping keypoint overlay.');
+          poseKeysMissingLogged = true;
+        }
+        lastDrawnFrame = currentFrame;
+        return;
+      }
+
+      const framePayload = poseData[currentFrame] ?? poseData[currentFrame.toString()];
+      if (!Array.isArray(framePayload)) {
+        if (!poseFrameMissingLogged) {
+          logToAPI(`No pose data for frame ${currentFrame}.`);
+          poseFrameMissingLogged = true;
+        }
+        lastDrawnFrame = currentFrame;
+        return;
+      }
+
+      const frameData = {};
+      poseKeys.forEach((keyName, idx) => {
+        frameData[keyName] = framePayload[idx];
+      });
+      poseFrameMissingLogged = false;
+
+      const hasBox = ['Box_X1', 'Box_Y1', 'Box_X2', 'Box_Y2'].every((key) => Number.isFinite(frameData[key]));
+      if (hasBox) {
         ctx.strokeStyle = 'rgba(0, 255, 0, 0.8)';
         ctx.lineWidth = 3;
         ctx.strokeRect(
@@ -657,8 +1471,19 @@
           frameData.Box_X2 - frameData.Box_X1,
           frameData.Box_Y2 - frameData.Box_Y1
         );
-        
-        // Draw joints
+      }
+
+      const jointKeys = [
+        'X_left_shoulder', 'Y_left_shoulder',
+        'X_right_shoulder', 'Y_right_shoulder',
+        'X_left_elbow', 'Y_left_elbow',
+        'X_right_elbow', 'Y_right_elbow',
+        'X_left_wrist', 'Y_left_wrist',
+        'X_right_wrist', 'Y_right_wrist'
+      ];
+      const hasAllJoints = jointKeys.every((key) => Number.isFinite(frameData[key]));
+
+      if (hasAllJoints) {
         ctx.fillStyle = 'rgba(0, 255, 0, 0.9)';
         const joints = [
           { x: frameData.X_left_shoulder,  y: frameData.Y_left_shoulder  },
@@ -668,28 +1493,31 @@
           { x: frameData.X_left_wrist,     y: frameData.Y_left_wrist     },
           { x: frameData.X_right_wrist,    y: frameData.Y_right_wrist    }
         ];
-        joints.forEach(joint => {
+
+        joints.forEach((joint) => {
           ctx.beginPath();
           ctx.arc(joint.x, joint.y, 7, 0, 2 * Math.PI);
           ctx.fill();
         });
-        
-        // Draw connecting lines between joints
+
         ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)';
         ctx.lineWidth = 4;
         ctx.beginPath();
-        // Left arm
         ctx.moveTo(frameData.X_left_shoulder, frameData.Y_left_shoulder);
         ctx.lineTo(frameData.X_left_elbow, frameData.Y_left_elbow);
         ctx.lineTo(frameData.X_left_wrist, frameData.Y_left_wrist);
-        // Right arm
         ctx.moveTo(frameData.X_right_shoulder, frameData.Y_right_shoulder);
         ctx.lineTo(frameData.X_right_elbow, frameData.Y_right_elbow);
         ctx.lineTo(frameData.X_right_wrist, frameData.Y_right_wrist);
         ctx.stroke();
+      }
 
+      poseKeysMissingLogged = false;
+
+      if (currentFrame !== lastDrawnFrame && currentFrame % 30 === 0) {
         logToAPI(`Keypoints drawn for frame ${currentFrame}.`);
       }
+      lastDrawnFrame = currentFrame;
     }
   </script>
 </body>
