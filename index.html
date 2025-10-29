@@ -1,5 +1,7 @@
 <!DOCTYPE html>
+
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -23,7 +25,9 @@
       --transition: 0.2s ease;
     }
 
-    *, *::before, *::after {
+    *,
+    *::before,
+    *::after {
       box-sizing: border-box;
     }
 
@@ -35,7 +39,9 @@
       line-height: 1.5;
     }
 
-    h1, h2, h3 {
+    h1,
+    h2,
+    h3 {
       font-weight: 600;
       color: var(--text);
       margin: 0;
@@ -95,21 +101,23 @@
       background: #0f172a;
       overflow: hidden;
       min-height: 300px;
+      aspect-ratio: 16 / 9; /* Default, will be updated by JS */
     }
 
-    #videoPreview {
-      width: 100%;
-      height: auto;
-      display: block;
-      object-fit: contain;
-      background: #000;
-    }
-
+    #videoPreview,
     #keypointsCanvas {
       position: absolute;
       inset: 0;
       width: 100%;
       height: 100%;
+    }
+
+    #videoPreview {
+      object-fit: contain;
+      background: #000;
+    }
+
+    #keypointsCanvas {
       pointer-events: none;
     }
 
@@ -590,6 +598,7 @@
     }
   </style>
 </head>
+
 <body>
   <div class="page">
     <header class="page-header">
@@ -643,7 +652,8 @@
           <span class="select-label">API Version</span>
           <select id="versionSelect" aria-describedby="modelStatusList"></select>
         </label>
-        <div id="modelStatusList" class="model-status" aria-live="polite" role="radiogroup" aria-label="Available models"></div>
+        <div id="modelStatusList" class="model-status" aria-live="polite" role="radiogroup"
+          aria-label="Available models"></div>
         <div class="status-grid">
           <div class="status-block" id="uploadPanel">
             <h3>Upload</h3>
@@ -675,6 +685,8 @@
     ------------------------------------------------------------------------ */
     const API_BASE_URL = 'https://ue7v1pazxb.execute-api.us-west-2.amazonaws.com';
     const OFFLINE_MODE_KEY = '__HAL_OFFLINE_DEBUG__';
+    const DEBUG_GUIDES_ENABLED = false; // Toggle calibration overlay helpers
+    const DEBUG_COORD_LOGS_ENABLED = false; // Toggle verbose frame logging
     const DEFAULT_ENDPOINTS = [
       { version: '0.5.1', endpoint_status: 'Offline', num_endpoint_instances: 0 },
       { version: '0.4.3', endpoint_status: 'Offline', num_endpoint_instances: 0 },
@@ -721,6 +733,7 @@
     /* ------------------------------------------------------------------------
        UI Helpers
     ------------------------------------------------------------------------ */
+
     function showInferencePlaceholder(message = 'No inference data yet.') {
       inferenceResults.innerHTML = `<div class="result-placeholder">${message}</div>`;
     }
@@ -878,6 +891,7 @@
     showInferencePlaceholder('No inference data available.');
     setActionAvailability({ select: false, debug: false, upload: false });
     populateVersionSelect(DEFAULT_ENDPOINTS, { offline: true });
+    resolveCanvasMetrics();
 
     /* ------------------------------------------------------------------------
        Event Wiring
@@ -891,6 +905,7 @@
     versionSelect.addEventListener('change', () => setSelectedVersion(versionSelect.value, { programmatic: true }));
     modelStatusList.addEventListener('click', handleModelSelectionClick);
     modelStatusList.addEventListener('keydown', handleModelStatusKeydown);
+    window.addEventListener('resize', resolveCanvasMetrics);
 
     /* ------------------------------------------------------------------------
        Event Handlers
@@ -997,9 +1012,9 @@
       }
 
       setActionAvailability({ select: false, debug: false, upload: false });
-      uploadMessage.textContent = 'Starting upload process...';
-      statusMessage.textContent = 'Upload initiated.';
-      downloadMessage.textContent = 'Waiting for processing...';
+      uploadMessage.textContent = 'Starting upload…';
+      statusMessage.textContent = 'Uploading video…';
+      downloadMessage.textContent = 'Awaiting processing…';
       showInferencePlaceholder('Waiting for inference results...');
       logToAPI('Upload process started.');
 
@@ -1026,9 +1041,7 @@
         const uploadData = await uploadResponse.json();
         const { guid, presigned_url: presignedUrl } = uploadData;
         logToAPI(`Upload details: GUID=${guid}, URL=${presignedUrl}`);
-        uploadMessage.textContent = `GUID: ${guid} — Preparing upload...`;
-
-        uploadMessage.textContent += '\nUploading video...';
+        uploadMessage.textContent = `Video GUID ${guid}`;
         logToAPI(`Uploading video to: ${presignedUrl}`);
         const putResponse = await fetch(presignedUrl, {
           method: 'PUT',
@@ -1040,10 +1053,10 @@
           throw new Error(`Upload failed: ${putResponse.status} ${putResponse.statusText}`);
         }
 
-        uploadMessage.textContent += '\nUpload successful!';
+        uploadMessage.textContent = 'Upload complete.';
         logToAPI('Video uploaded to AWS.');
 
-        statusMessage.textContent = 'Video uploaded. Processing started.';
+        statusMessage.textContent = 'Processing started…';
         logToAPI('Starting status polling.');
         pollStatus(guid);
       } catch (error) {
@@ -1061,9 +1074,9 @@
 
       setActionAvailability({ select: false, debug: false, upload: false });
       logToAPI('Debug test triggered.');
-      uploadMessage.textContent = 'Debug test initiated. Skipping upload...';
-      statusMessage.textContent = 'Simulating processing...';
-      downloadMessage.textContent = 'Fetching debug results...';
+      uploadMessage.textContent = 'Debug mode active, upload skipped.';
+      statusMessage.textContent = 'Simulating processing…';
+      downloadMessage.textContent = 'Loading debug JSON…';
       showInferencePlaceholder('Waiting for debug results...');
 
       const debugJson = {
@@ -1082,36 +1095,38 @@
             right_prediction: 2,
             right_confidence: 0.78,
             track_length: 20,
-            pose_keys: [
-              'Box_X1','Box_Y1','Box_X2','Box_Y2',
-              'X_left_shoulder','Y_left_shoulder',
-              'X_right_shoulder','Y_right_shoulder',
-              'X_left_elbow','Y_left_elbow',
-              'X_right_elbow','Y_right_elbow',
-              'X_left_wrist','Y_left_wrist',
-              'X_right_wrist','Y_right_wrist'
-            ],
+            pose_keys: ['Box_X1','Box_Y1','Box_X2','Box_Y2','X_left_shoulder','Y_left_shoulder','X_right_shoulder','Y_right_shoulder','X_left_elbow','Y_left_elbow','X_right_elbow','Y_right_elbow','X_left_wrist','Y_left_wrist','X_right_wrist','Y_right_wrist'],
             pose_df: {
-              '0': [88, 212, 276, 701, 234, 299, 163, 290, 226, 377, 127, 336, 143, 409, 102, 351],
-              '1': [87, 211, 276, 700, 233, 298, 162, 290, 226, 375, 126, 337, 143, 407, 102, 350],
-              '2': [87, 210, 275, 699, 231, 297, 161, 290, 226, 374, 125, 337, 142, 406, 101, 350],
-              '3': [86, 210, 274, 698, 230, 296, 160, 289, 225, 372, 124, 338, 142, 404, 101, 349],
-              '4': [86, 209, 274, 697, 228, 295, 159, 289, 225, 371, 123, 338, 142, 403, 101, 348],
-              '5': [86, 209, 273, 696, 227, 295, 158, 289, 224, 370, 123, 338, 142, 402, 100, 348],
-              '6': [86, 208, 273, 696, 227, 294, 157, 289, 224, 370, 122, 339, 142, 401, 100, 347],
-              '7': [86, 208, 272, 695, 226, 294, 157, 289, 223, 370, 122, 339, 142, 401, 100, 347],
-              '8': [86, 209, 272, 694, 225, 294, 156, 289, 223, 369, 122, 340, 142, 400, 100, 347],
-              '9': [87, 209, 271, 694, 225, 294, 156, 290, 223, 369, 123, 340, 142, 400, 100, 346],
-              '10': [87, 209, 271, 694, 224, 294, 156, 290, 222, 369, 123, 341, 142, 400, 100, 346],
-              '11': [88, 210, 270, 693, 223, 294, 156, 290, 222, 369, 123, 341, 142, 399, 100, 346],
-              '12': [88, 211, 270, 693, 222, 295, 156, 291, 221, 369, 123, 341, 142, 399, 101, 346],
-              '13': [88, 212, 269, 692, 221, 295, 156, 292, 221, 369, 124, 342, 141, 399, 101, 345],
-              '14': [87, 212, 268, 691, 220, 295, 156, 292, 221, 368, 124, 343, 141, 399, 101, 345],
-              '15': [87, 213, 267, 690, 219, 294, 155, 293, 220, 368, 124, 344, 141, 399, 102, 345],
-              '16': [86, 213, 266, 688, 218, 294, 155, 293, 220, 368, 124, 345, 141, 399, 102, 346],
-              '17': [86, 213, 265, 686, 218, 294, 154, 293, 220, 368, 125, 346, 141, 399, 103, 346],
-              '18': [85, 213, 264, 684, 217, 293, 154, 293, 220, 367, 125, 347, 141, 400, 103, 346],
-              '19': [85, 213, 264, 683, 216, 293, 154, 293, 220, 367, 125, 347, 141, 400, 104, 347]
+              "0": [262,0,629,1077,315,186,474,232,363,398,567,463,533,380,610,402],
+              "1": [275,0,647,1077,323,185,486,230,379,394,575,458,551,366,618,388],
+              "2": [287,0,664,1077,331,183,497,228,395,389,582,453,568,353,627,374],
+              "3": [299,0,679,1077,340,181,507,225,409,385,589,448,583,341,635,362],
+              "4": [309,0,692,1077,348,179,515,221,422,380,596,442,597,331,642,350],
+              "5": [319,0,704,1077,357,175,521,217,432,375,603,436,608,322,649,339],
+              "6": [327,0,712,1077,366,172,526,213,441,369,609,430,617,313,656,330],
+              "7": [333,0,718,1077,374,168,529,208,448,364,614,424,623,307,661,323],
+              "8": [338,0,721,1077,380,164,532,205,452,359,619,419,626,302,665,318],
+              "9": [342,1,721,1077,385,162,533,202,455,357,622,417,627,301,667,317],
+              "10": [344,1,717,1077,389,161,533,202,457,356,623,416,626,304,668,320],
+              "11": [345,2,712,1077,391,162,533,203,457,360,622,418,624,313,667,328],
+              "12": [346,2,705,1078,392,164,533,206,458,366,620,424,621,326,665,341],
+              "13": [347,2,699,1079,394,168,531,210,457,375,617,432,618,342,663,357],
+              "14": [349,3,694,1079,396,173,530,215,457,385,614,443,615,360,662,376],
+              "15": [351,3,690,1080,398,178,527,220,457,396,611,455,613,379,661,395],
+              "16": [354,3,689,1080,401,183,525,226,457,407,608,468,611,396,661,413],
+              "17": [359,2,688,1080,406,187,522,231,457,416,605,482,609,412,662,430],
+              "18": [364,2,688,1080,411,190,520,237,456,424,601,494,607,425,663,444],
+              "19": [370,1,688,1080,417,192,518,241,456,430,596,505,605,437,663,457],
+              "20": [377,1,687,1080,422,194,517,245,455,435,589,515,602,447,663,468],
+              "21": [383,1,687,1079,428,196,516,249,454,439,580,524,598,456,662,478],
+              "22": [389,0,687,1079,434,197,517,252,454,441,568,532,596,462,661,487],
+              "23": [394,0,688,1079,441,199,517,255,457,442,555,539,595,465,658,496],
+              "24": [398,0,693,1078,449,200,518,258,463,440,541,545,599,464,655,505],
+              "25": [402,0,702,1078,459,202,518,262,475,435,527,551,608,457,652,513],
+              "26": [404,0,719,1078,471,205,516,265,493,427,513,557,625,445,649,520],
+              "27": [406,0,743,1078,486,207,513,269,518,417,500,563,649,429,646,528],
+              "28": [406,0,775,1078,503,210,507,273,549,404,488,569,682,410,643,534],
+              "29": [405,0,814,1078,521,211,500,276,584,389,478,575,721,389,640,542]
             }
           }
         ]
@@ -1119,7 +1134,8 @@
 
       setTimeout(() => {
         applyInferenceResult(debugJson, 'Debug');
-      }, 1000);
+      }, 500);
+      
     }
 
     /* ------------------------------------------------------------------------
@@ -1135,7 +1151,12 @@
       videoPreview.pause();
       videoPreview.removeAttribute('src');
       videoPreview.load();
-      keypointsCanvas.getContext('2d').clearRect(0, 0, keypointsCanvas.width, keypointsCanvas.height);
+      const resetCtx = keypointsCanvas.getContext('2d');
+      if (resetCtx) {
+        resetCtx.setTransform(1, 0, 0, 1, 0, 0);
+        resetCtx.clearRect(0, 0, keypointsCanvas.width, keypointsCanvas.height);
+      }
+      resolveCanvasMetrics();
 
       refreshActionAvailability();
 
@@ -1219,8 +1240,9 @@
       videoPreview.src = videoURL;
       videoPreview.controls = true;
       videoPreview.onloadedmetadata = () => {
-        keypointsCanvas.width = videoPreview.videoWidth;
-        keypointsCanvas.height = videoPreview.videoHeight;
+        const aspectRatio = `${videoPreview.videoWidth} / ${videoPreview.videoHeight}`;
+        document.getElementById('videoContainer').style.aspectRatio = aspectRatio;
+        resolveCanvasMetrics();
         logToAPI(`Video metadata loaded: ${videoPreview.videoWidth}x${videoPreview.videoHeight}, duration ${videoPreview.duration.toFixed(2)}s.`);
       };
 
@@ -1243,7 +1265,7 @@
       const pollTimer = setInterval(async () => {
         pollCount += 1;
         logToAPI(`Polling attempt #${pollCount}`);
-        statusMessage.textContent = `Status check #${pollCount}...`;
+        statusMessage.textContent = `Status check ${pollCount}`;
 
         try {
           const statusEndpoint = `${API_BASE_URL}/status/dev/${encodeURIComponent(guid)}`;
@@ -1258,23 +1280,23 @@
 
           const statusData = await statusRes.json();
           logToAPI(`Status: ${JSON.stringify(statusData)}`);
-          statusMessage.textContent = `Current Status: ${statusData.status}`;
+          statusMessage.textContent = statusData.status || 'Processing';
 
           if (statusData.status === 'done') {
             clearInterval(pollTimer);
-            statusMessage.textContent += ' — Processing complete.';
-            downloadMessage.textContent = 'Fetching final results...';
+            statusMessage.textContent = 'Processing complete';
+            downloadMessage.textContent = 'Downloading results…';
             logToAPI('Processing complete. Fetching results.');
             fetchFinalResults(guid);
           } else if (pollCount >= maxPolls) {
             clearInterval(pollTimer);
-            statusMessage.textContent += ' — Max polling attempts reached.';
-            downloadMessage.textContent = 'Processing timed out.';
+            statusMessage.textContent = 'Processing timed out';
+            downloadMessage.textContent = 'No results available.';
             logToAPI('Max polling reached.');
             refreshActionAvailability();
           }
         } catch (error) {
-          statusMessage.textContent = `Error: ${error.message}`;
+          statusMessage.textContent = `Polling failed`;
           logToAPI(`Polling error: ${error.message}`);
           clearInterval(pollTimer);
           refreshActionAvailability();
@@ -1389,7 +1411,7 @@
       setupCanvasRendering();
 
       if (videoPreview.paused || videoPreview.ended) {
-        videoPreview.play().catch(() => {});
+        videoPreview.play().catch(() => { });
       }
 
       refreshActionAvailability();
@@ -1401,16 +1423,11 @@
         return;
       }
 
-      if (videoPreview.readyState >= 2) {
-        keypointsCanvas.width = videoPreview.videoWidth;
-        keypointsCanvas.height = videoPreview.videoHeight;
-      }
+      resolveCanvasMetrics();
 
       if (!isRenderLoopAttached) {
         videoPreview.addEventListener('play', renderLoop);
-        videoPreview.addEventListener('seeked', () => {
-          requestAnimationFrame(renderLoop);
-        });
+        videoPreview.addEventListener('seeked', () => requestAnimationFrame(renderLoop));
         isRenderLoopAttached = true;
         logToAPI('Keypoints overlay setup complete. Render loop attached.');
       } else {
@@ -1431,46 +1448,64 @@
     }
 
     function drawKeypointsOverlay() {
-      const currentTime = videoPreview.currentTime;
-      const currentFrame = Math.floor(currentTime * frameRate);
-      const ctx = keypointsCanvas.getContext('2d');
-      ctx.clearRect(0, 0, keypointsCanvas.width, keypointsCanvas.height);
+      const metrics = resolveCanvasMetrics();
+      if (!metrics) {
+        return;
+      }
+
+      const { ctx, scale, offsetX, offsetY, renderW, renderH } = metrics;
+      const toCanvasX = (value) => offsetX + value * scale;
+      const toCanvasY = (value) => offsetY + value * scale;
+
+      if (DEBUG_GUIDES_ENABLED) {
+        drawCalibrationGuides(ctx, metrics, toCanvasX, toCanvasY);
+      }
 
       if (!poseKeys.length) {
         if (!poseKeysMissingLogged) {
           logToAPI('Pose keys unavailable; skipping keypoint overlay.');
           poseKeysMissingLogged = true;
         }
-        lastDrawnFrame = currentFrame;
         return;
       }
+      poseKeysMissingLogged = false;
 
-      const framePayload = poseData[currentFrame] ?? poseData[currentFrame.toString()];
+      const currentFrame = Math.floor(videoPreview.currentTime * frameRate);
+      const framePayload = poseData[currentFrame] ?? poseData[currentFrame?.toString?.()];
       if (!Array.isArray(framePayload)) {
         if (!poseFrameMissingLogged) {
           logToAPI(`No pose data for frame ${currentFrame}.`);
           poseFrameMissingLogged = true;
         }
-        lastDrawnFrame = currentFrame;
         return;
       }
+      poseFrameMissingLogged = false;
 
       const frameData = {};
-      poseKeys.forEach((keyName, idx) => {
-        frameData[keyName] = framePayload[idx];
+      poseKeys.forEach((key, index) => {
+        frameData[key] = framePayload[index];
       });
-      poseFrameMissingLogged = false;
+
+      if (DEBUG_COORD_LOGS_ENABLED && currentFrame !== lastDrawnFrame) {
+        console.group(`Frame ${currentFrame}`);
+        console.log('Video intrinsic:', { width: videoPreview.videoWidth, height: videoPreview.videoHeight });
+        console.log('Render metrics:', { scale, offsetX, offsetY, renderW, renderH });
+      }
 
       const hasBox = ['Box_X1', 'Box_Y1', 'Box_X2', 'Box_Y2'].every((key) => Number.isFinite(frameData[key]));
       if (hasBox) {
+        const x1 = toCanvasX(frameData.Box_X1);
+        const y1 = toCanvasY(frameData.Box_Y1);
+        const x2 = toCanvasX(frameData.Box_X2);
+        const y2 = toCanvasY(frameData.Box_Y2);
+
+        if (DEBUG_COORD_LOGS_ENABLED && currentFrame !== lastDrawnFrame) {
+          console.log('Box (canvas CSS px):', { x1, y1, x2, y2 });
+        }
+
         ctx.strokeStyle = 'rgba(0, 255, 0, 0.8)';
         ctx.lineWidth = 3;
-        ctx.strokeRect(
-          frameData.Box_X1,
-          frameData.Box_Y1,
-          frameData.Box_X2 - frameData.Box_X1,
-          frameData.Box_Y2 - frameData.Box_Y1
-        );
+        ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
       }
 
       const jointKeys = [
@@ -1481,44 +1516,153 @@
         'X_left_wrist', 'Y_left_wrist',
         'X_right_wrist', 'Y_right_wrist'
       ];
-      const hasAllJoints = jointKeys.every((key) => Number.isFinite(frameData[key]));
 
-      if (hasAllJoints) {
+      const hasJoints = jointKeys.every((key) => Number.isFinite(frameData[key]));
+      if (hasJoints) {
+        const jointPairs = [
+          ['left_shoulder', frameData.X_left_shoulder, frameData.Y_left_shoulder],
+          ['right_shoulder', frameData.X_right_shoulder, frameData.Y_right_shoulder],
+          ['left_elbow', frameData.X_left_elbow, frameData.Y_left_elbow],
+          ['right_elbow', frameData.X_right_elbow, frameData.Y_right_elbow],
+          ['left_wrist', frameData.X_left_wrist, frameData.Y_left_wrist],
+          ['right_wrist', frameData.X_right_wrist, frameData.Y_right_wrist]
+        ].map(([label, x, y]) => ({ label, x: toCanvasX(x), y: toCanvasY(y) }));
+
+        if (DEBUG_COORD_LOGS_ENABLED && currentFrame !== lastDrawnFrame) {
+          console.log('Joints (canvas CSS px):', jointPairs);
+        }
+
         ctx.fillStyle = 'rgba(0, 255, 0, 0.9)';
-        const joints = [
-          { x: frameData.X_left_shoulder,  y: frameData.Y_left_shoulder  },
-          { x: frameData.X_right_shoulder, y: frameData.Y_right_shoulder },
-          { x: frameData.X_left_elbow,     y: frameData.Y_left_elbow     },
-          { x: frameData.X_right_elbow,    y: frameData.Y_right_elbow    },
-          { x: frameData.X_left_wrist,     y: frameData.Y_left_wrist     },
-          { x: frameData.X_right_wrist,    y: frameData.Y_right_wrist    }
-        ];
-
-        joints.forEach((joint) => {
+        jointPairs.forEach(({ x, y }) => {
           ctx.beginPath();
-          ctx.arc(joint.x, joint.y, 7, 0, 2 * Math.PI);
+          ctx.arc(x, y, 7, 0, Math.PI * 2);
           ctx.fill();
         });
 
         ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)';
         ctx.lineWidth = 4;
         ctx.beginPath();
-        ctx.moveTo(frameData.X_left_shoulder, frameData.Y_left_shoulder);
-        ctx.lineTo(frameData.X_left_elbow, frameData.Y_left_elbow);
-        ctx.lineTo(frameData.X_left_wrist, frameData.Y_left_wrist);
-        ctx.moveTo(frameData.X_right_shoulder, frameData.Y_right_shoulder);
-        ctx.lineTo(frameData.X_right_elbow, frameData.Y_right_elbow);
-        ctx.lineTo(frameData.X_right_wrist, frameData.Y_right_wrist);
+        ctx.moveTo(jointPairs[0].x, jointPairs[0].y);
+        ctx.lineTo(jointPairs[2].x, jointPairs[2].y);
+        ctx.lineTo(jointPairs[4].x, jointPairs[4].y);
+        ctx.moveTo(jointPairs[1].x, jointPairs[1].y);
+        ctx.lineTo(jointPairs[3].x, jointPairs[3].y);
+        ctx.lineTo(jointPairs[5].x, jointPairs[5].y);
         ctx.stroke();
       }
 
-      poseKeysMissingLogged = false;
-
-      if (currentFrame !== lastDrawnFrame && currentFrame % 30 === 0) {
-        logToAPI(`Keypoints drawn for frame ${currentFrame}.`);
+      if (DEBUG_COORD_LOGS_ENABLED && currentFrame !== lastDrawnFrame) {
+        console.groupEnd();
       }
+
       lastDrawnFrame = currentFrame;
+    }
+
+    function drawCalibrationGuides(ctx, metrics, toCanvasX, toCanvasY) {
+      const { renderW, renderH, offsetX, offsetY } = metrics;
+      const vw = videoPreview.videoWidth;
+      const vh = videoPreview.videoHeight;
+      if (!vw || !vh) {
+        return;
+      }
+
+      const centerX = toCanvasX(vw / 2);
+      const centerY = toCanvasY(vh / 2);
+
+      ctx.save();
+
+      ctx.strokeStyle = 'rgba(255, 255, 0, 0.55)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([8, 6]);
+      ctx.strokeRect(offsetX, offsetY, renderW, renderH);
+      ctx.setLineDash([]);
+
+      ctx.strokeStyle = 'rgba(236, 72, 153, 0.45)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(centerX - 24, centerY);
+      ctx.lineTo(centerX + 24, centerY);
+      ctx.moveTo(centerX, centerY - 24);
+      ctx.lineTo(centerX, centerY + 24);
+      ctx.stroke();
+
+      ctx.font = '11px Inter, sans-serif';
+      ctx.textBaseline = 'top';
+      ctx.fillStyle = 'rgba(59, 130, 246, 0.85)';
+      [
+        { label: 'TL', x: 0, y: 0 },
+        { label: 'TR', x: vw, y: 0 },
+        { label: 'BR', x: vw, y: vh },
+        { label: 'BL', x: 0, y: vh }
+      ].forEach(({ label, x, y }) => {
+        const cx = toCanvasX(x);
+        const cy = toCanvasY(y);
+        ctx.beginPath();
+        ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillText(label, cx + 6, cy + 2);
+      });
+
+      const inset = 100;
+      if (vw > inset * 2 && vh > inset * 2) {
+        ctx.strokeStyle = 'rgba(34, 197, 94, 0.45)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 4]);
+        ctx.strokeRect(
+          toCanvasX(inset),
+          toCanvasY(inset),
+          toCanvasX(vw - inset) - toCanvasX(inset),
+          toCanvasY(vh - inset) - toCanvasY(inset)
+        );
+        ctx.setLineDash([]);
+      }
+
+      ctx.restore();
+    }
+
+    function resolveCanvasMetrics() {
+      const ctx = keypointsCanvas.getContext('2d');
+      if (!ctx) {
+        return null;
+      }
+
+      const dpr = window.devicePixelRatio || 1;
+      const cssWidth = videoPreview.clientWidth || keypointsCanvas.clientWidth || videoPreview.videoWidth || 0;
+      const cssHeight = videoPreview.clientHeight || keypointsCanvas.clientHeight || videoPreview.videoHeight || 0;
+
+      if (!cssWidth || !cssHeight) {
+        return null;
+      }
+
+      keypointsCanvas.style.width = `${cssWidth}px`;
+      keypointsCanvas.style.height = `${cssHeight}px`;
+
+      const requiredWidth = Math.round(cssWidth * dpr);
+      const requiredHeight = Math.round(cssHeight * dpr);
+      if (keypointsCanvas.width !== requiredWidth || keypointsCanvas.height !== requiredHeight) {
+        keypointsCanvas.width = requiredWidth;
+        keypointsCanvas.height = requiredHeight;
+      }
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, keypointsCanvas.width, keypointsCanvas.height);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      const vw = videoPreview.videoWidth || 0;
+      const vh = videoPreview.videoHeight || 0;
+      if (!vw || !vh) {
+        return { ctx, scale: 1, offsetX: 0, offsetY: 0, renderW: cssWidth, renderH: cssHeight };
+      }
+
+      const scale = Math.min(cssWidth / vw, cssHeight / vh);
+      const renderW = vw * scale;
+      const renderH = vh * scale;
+      const offsetX = (cssWidth - renderW) / 2;
+      const offsetY = (cssHeight - renderH) / 2;
+
+      return { ctx, scale, offsetX, offsetY, renderW, renderH };
     }
   </script>
 </body>
+
 </html>
