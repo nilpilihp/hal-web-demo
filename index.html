@@ -698,12 +698,12 @@
     let selectedVideoBlob = null;
     let poseData = {};
     let poseKeys = [];
-    let frameRate = 30;
     let isRenderLoopAttached = false;
     let lastDrawnFrame = null;
     let poseKeysMissingLogged = false;
     let poseFrameMissingLogged = false;
     let availableModels = [];
+    let videoMetadata = { width: null, height: null, fps: 30, totalFrames: null };
 
     /* ------------------------------------------------------------------------
        DOM References
@@ -1084,8 +1084,12 @@
         status: 'success',
         message: 'Debug inference completed successfully',
         warnings: [],
-        fps: 30.0,
-        total_frames: 20,
+        video_metadata: {
+          fps: 29.565029565029565,
+          total_frames: 730,
+          width: 1440,
+          height: 1080
+        },
         subjects: [
           {
             subject_id: 0,
@@ -1145,8 +1149,8 @@
       selectedVideoBlob = null;
       poseData = {};
       poseKeys = [];
-      frameRate = 30;
       availableModels = [];
+      videoMetadata = { width: null, height: null, fps: 30, totalFrames: null };
 
       videoPreview.pause();
       videoPreview.removeAttribute('src');
@@ -1364,7 +1368,16 @@
 
       poseData = subject.pose_df || {};
       poseKeys = subject.pose_keys || [];
-      frameRate = finalJson.fps || 30;
+      const responseMeta = finalJson.video_metadata || {};
+      videoMetadata = {
+        width: Number(responseMeta.width) || videoMetadata.width || null,
+        height: Number(responseMeta.height) || videoMetadata.height || null,
+        fps: Number(responseMeta.fps) || videoMetadata.fps || 30,
+        totalFrames: Number(responseMeta.total_frames) || videoMetadata.totalFrames
+      };
+      if (videoMetadata.width && videoMetadata.height) {
+        document.getElementById('videoContainer').style.aspectRatio = `${videoMetadata.width} / ${videoMetadata.height}`;
+      }
 
       lastDrawnFrame = null;
       poseKeysMissingLogged = false;
@@ -1417,6 +1430,9 @@
       refreshActionAvailability();
     }
 
+    /* ------------------------------------------------------------------------
+       Canvas Rendering
+    ------------------------------------------------------------------------ */
     function setupCanvasRendering() {
       if (Object.keys(poseData).length === 0) {
         logToAPI('No pose data available for rendering.');
@@ -1453,12 +1469,25 @@
         return;
       }
 
-      const { ctx, scale, offsetX, offsetY, renderW, renderH } = metrics;
-      const toCanvasX = (value) => offsetX + value * scale;
-      const toCanvasY = (value) => offsetY + value * scale;
+      const {
+        ctx,
+        offsetX,
+        offsetY,
+        renderW,
+        renderH,
+        poseScaleX,
+        poseScaleY,
+        intrinsicWidth,
+        intrinsicHeight,
+        poseWidth,
+        poseHeight
+      } = metrics;
+
+      const toCanvasX = (value) => offsetX + value * poseScaleX;
+      const toCanvasY = (value) => offsetY + value * poseScaleY;
 
       if (DEBUG_GUIDES_ENABLED) {
-        drawCalibrationGuides(ctx, metrics, toCanvasX, toCanvasY);
+        drawCalibrationGuides(ctx, { offsetX, offsetY, renderW, renderH, intrinsicWidth, intrinsicHeight });
       }
 
       if (!poseKeys.length) {
@@ -1470,7 +1499,7 @@
       }
       poseKeysMissingLogged = false;
 
-      const currentFrame = Math.floor(videoPreview.currentTime * frameRate);
+      const currentFrame = Math.floor(videoPreview.currentTime * (videoMetadata.fps || 30));
       const framePayload = poseData[currentFrame] ?? poseData[currentFrame?.toString?.()];
       if (!Array.isArray(framePayload)) {
         if (!poseFrameMissingLogged) {
@@ -1488,8 +1517,19 @@
 
       if (DEBUG_COORD_LOGS_ENABLED && currentFrame !== lastDrawnFrame) {
         console.group(`Frame ${currentFrame}`);
-        console.log('Video intrinsic:', { width: videoPreview.videoWidth, height: videoPreview.videoHeight });
-        console.log('Render metrics:', { scale, offsetX, offsetY, renderW, renderH });
+        console.log('Video metadata:', videoMetadata);
+        console.log('Render metrics:', {
+          offsetX,
+          offsetY,
+          renderW,
+          renderH,
+          poseScaleX,
+          poseScaleY,
+          intrinsicWidth,
+          intrinsicHeight,
+          poseWidth,
+          poseHeight
+        });
       }
 
       const hasBox = ['Box_X1', 'Box_Y1', 'Box_X2', 'Box_Y2'].every((key) => Number.isFinite(frameData[key]));
@@ -1558,16 +1598,14 @@
       lastDrawnFrame = currentFrame;
     }
 
-    function drawCalibrationGuides(ctx, metrics, toCanvasX, toCanvasY) {
-      const { renderW, renderH, offsetX, offsetY } = metrics;
-      const vw = videoPreview.videoWidth;
-      const vh = videoPreview.videoHeight;
-      if (!vw || !vh) {
+    function drawCalibrationGuides(ctx, metrics) {
+      const { renderW, renderH, offsetX, offsetY, intrinsicWidth, intrinsicHeight } = metrics;
+      if (!intrinsicWidth || !intrinsicHeight) {
         return;
       }
 
-      const centerX = toCanvasX(vw / 2);
-      const centerY = toCanvasY(vh / 2);
+      const centerX = offsetX + renderW / 2;
+      const centerY = offsetY + renderH / 2;
 
       ctx.save();
 
@@ -1586,17 +1624,22 @@
       ctx.lineTo(centerX, centerY + 24);
       ctx.stroke();
 
+      ctx.fillStyle = 'rgba(96, 165, 250, 0.8)';
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, 6, 0, Math.PI * 2);
+      ctx.fill();
+
       ctx.font = '11px Inter, sans-serif';
       ctx.textBaseline = 'top';
       ctx.fillStyle = 'rgba(59, 130, 246, 0.85)';
       [
         { label: 'TL', x: 0, y: 0 },
-        { label: 'TR', x: vw, y: 0 },
-        { label: 'BR', x: vw, y: vh },
-        { label: 'BL', x: 0, y: vh }
+        { label: 'TR', x: intrinsicWidth, y: 0 },
+        { label: 'BR', x: intrinsicWidth, y: intrinsicHeight },
+        { label: 'BL', x: 0, y: intrinsicHeight }
       ].forEach(({ label, x, y }) => {
-        const cx = toCanvasX(x);
-        const cy = toCanvasY(y);
+        const cx = offsetX + (x / intrinsicWidth) * renderW;
+        const cy = offsetY + (y / intrinsicHeight) * renderH;
         ctx.beginPath();
         ctx.arc(cx, cy, 5, 0, Math.PI * 2);
         ctx.fill();
@@ -1604,15 +1647,15 @@
       });
 
       const inset = 100;
-      if (vw > inset * 2 && vh > inset * 2) {
+      if (intrinsicWidth > inset * 2 && intrinsicHeight > inset * 2) {
         ctx.strokeStyle = 'rgba(34, 197, 94, 0.45)';
         ctx.lineWidth = 1.5;
         ctx.setLineDash([4, 4]);
         ctx.strokeRect(
-          toCanvasX(inset),
-          toCanvasY(inset),
-          toCanvasX(vw - inset) - toCanvasX(inset),
-          toCanvasY(vh - inset) - toCanvasY(inset)
+          offsetX + (inset / intrinsicWidth) * renderW,
+          offsetY + (inset / intrinsicHeight) * renderH,
+          renderW - (2 * inset / intrinsicWidth) * renderW,
+          renderH - (2 * inset / intrinsicHeight) * renderH
         );
         ctx.setLineDash([]);
       }
@@ -1627,8 +1670,8 @@
       }
 
       const dpr = window.devicePixelRatio || 1;
-      const cssWidth = videoPreview.clientWidth || keypointsCanvas.clientWidth || videoPreview.videoWidth || 0;
-      const cssHeight = videoPreview.clientHeight || keypointsCanvas.clientHeight || videoPreview.videoHeight || 0;
+      const cssWidth = videoPreview.clientWidth || keypointsCanvas.clientWidth || videoMetadata.width || videoPreview.videoWidth || 0;
+      const cssHeight = videoPreview.clientHeight || keypointsCanvas.clientHeight || videoMetadata.height || videoPreview.videoHeight || 0;
 
       if (!cssWidth || !cssHeight) {
         return null;
@@ -1648,19 +1691,37 @@
       ctx.clearRect(0, 0, keypointsCanvas.width, keypointsCanvas.height);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-      const vw = videoPreview.videoWidth || 0;
-      const vh = videoPreview.videoHeight || 0;
-      if (!vw || !vh) {
-        return { ctx, scale: 1, offsetX: 0, offsetY: 0, renderW: cssWidth, renderH: cssHeight };
+      const intrinsicWidth = videoPreview.videoWidth || videoMetadata.width || 0;
+      const intrinsicHeight = videoPreview.videoHeight || videoMetadata.height || 0;
+      if (!intrinsicWidth || !intrinsicHeight) {
+        return null;
       }
 
-      const scale = Math.min(cssWidth / vw, cssHeight / vh);
-      const renderW = vw * scale;
-      const renderH = vh * scale;
+      const poseWidth = videoMetadata.width || intrinsicWidth;
+      const poseHeight = videoMetadata.height || intrinsicHeight;
+
+      const renderScale = Math.min(cssWidth / intrinsicWidth, cssHeight / intrinsicHeight);
+      const renderW = intrinsicWidth * renderScale;
+      const renderH = intrinsicHeight * renderScale;
       const offsetX = (cssWidth - renderW) / 2;
       const offsetY = (cssHeight - renderH) / 2;
 
-      return { ctx, scale, offsetX, offsetY, renderW, renderH };
+      const poseScaleX = poseWidth ? renderW / poseWidth : renderScale;
+      const poseScaleY = poseHeight ? renderH / poseHeight : renderScale;
+
+      return {
+        ctx,
+        offsetX,
+        offsetY,
+        renderW,
+        renderH,
+        poseScaleX,
+        poseScaleY,
+        intrinsicWidth,
+        intrinsicHeight,
+        poseWidth,
+        poseHeight
+      };
     }
   </script>
 </body>
