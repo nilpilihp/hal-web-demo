@@ -688,6 +688,7 @@
     const DEBUG_GUIDES_ENABLED = false; // Toggle calibration overlay helpers
     const DEBUG_COORD_LOGS_ENABLED = false; // Toggle verbose frame logging
     const DEFAULT_ENDPOINTS = [
+      { version: '0.6.0', endpoint_status: 'Offline', num_endpoint_instances: 0 },
       { version: '0.5.1', endpoint_status: 'Offline', num_endpoint_instances: 0 },
       { version: '0.4.3', endpoint_status: 'Offline', num_endpoint_instances: 0 },
       { version: '0.4.2', endpoint_status: 'Offline', num_endpoint_instances: 0 },
@@ -1589,6 +1590,46 @@
         ctx.lineTo(jointPairs[3].x, jointPairs[3].y);
         ctx.lineTo(jointPairs[5].x, jointPairs[5].y);
         ctx.stroke();
+
+        // ---------------------------------------------------------
+        // Draw Hand Joints (Fingers) if available (v0.6.0+)
+        // ---------------------------------------------------------
+        const fingers = ['thumb', 'index', 'middle', 'ring', 'pinky'];
+        const handSides = [
+          { side: 'left', wristIdx: 4 },
+          { side: 'right', wristIdx: 5 }
+        ];
+
+        handSides.forEach(({ side, wristIdx }) => {
+          const wrist = jointPairs[wristIdx];
+          
+          fingers.forEach((finger) => {
+            const xKey = `X_${side}_${finger}_tip`;
+            const yKey = `Y_${side}_${finger}_tip`;
+            
+            const xVal = frameData[xKey];
+            const yVal = frameData[yKey];
+
+            if (Number.isFinite(xVal) && Number.isFinite(yVal)) {
+              const tipX = toCanvasX(xVal);
+              const tipY = toCanvasY(yVal);
+
+              // Draw connection from wrist to finger tip
+              ctx.beginPath();
+              ctx.moveTo(wrist.x, wrist.y);
+              ctx.lineTo(tipX, tipY);
+              ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)'; // Matching color scheme, slightly more transparent
+              ctx.lineWidth = 2;
+              ctx.stroke();
+
+              // Draw finger tip
+              ctx.beginPath();
+              ctx.arc(tipX, tipY, 4, 0, Math.PI * 2);
+              ctx.fillStyle = 'rgba(0, 255, 0, 0.9)'; // Matching point color
+              ctx.fill();
+            }
+          });
+        });
       }
 
       if (DEBUG_COORD_LOGS_ENABLED && currentFrame !== lastDrawnFrame) {
