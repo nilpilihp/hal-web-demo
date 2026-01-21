@@ -604,10 +604,10 @@
   <div class="page">
     <header class="page-header">
       <h1>HAL Web Demo</h1>
-      <p class="page-subtitle">Upload or debug a video and review inference results in real time.</p>
+      <p class="page-subtitle">Upload videos, visualize previous results, and review inference data in real time.</p>
     </header>
 
-    <div class="modal" id="apiKeyModel" role="dialog" aria-modal="true" aria-labelledby="apiKeyModalTitle">
+    <div class="modal" id="apiKeyModel" role="dialog" aria-modal="true" aria-labelledby="apiKeyModalTitle" style="display: none;">
       <div class="modal__content" id="apiKeyModelContent">
         <h2 class="modal__title" id="apiKeyModalTitle">Enter API Key</h2>
         <p class="modal__hint">Provide your HAL API key or switch to offline debug mode.</p>
@@ -637,7 +637,7 @@
       <section class="surface surface--workflow" aria-labelledby="workflowTitle">
         <div class="surface__header">
           <h2 id="workflowTitle">Workflow</h2>
-          <p class="surface__description">Select a video, run a debug pass, or push to AWS for full inference.</p>
+          <p class="surface__description">Select a video, visualize previous results by UID, or push to AWS for full inference.</p>
         </div>
         <div class="workflow-actions">
           <div class="workflow-actions__primary">
@@ -645,7 +645,7 @@
             <button id="uploadBtn" class="button button--primary" type="button" disabled>Upload to AWS</button>
           </div>
           <div class="workflow-actions__secondary">
-            <button id="debugBtn" class="button button--ghost" type="button" disabled>Debug Test</button>
+            <button id="debugBtn" class="button button--ghost" type="button" disabled title="Visualize results from a previous run by UID">Visualize Previous Run</button>
           </div>
           <input type="file" id="fileSelectInput" accept="video/*" />
         </div>
@@ -755,8 +755,8 @@
     function refreshActionAvailability() {
       setActionAvailability({
         select: true,
-        debug: Boolean(selectedVideoBlob),
-        upload: Boolean(selectedVideoBlob) && API_KEY !== OFFLINE_MODE_KEY
+        debug: Boolean(API_KEY),  // Visualization available when any key is set
+        upload: Boolean(selectedVideoBlob) && Boolean(API_KEY)
       });
     }
 
@@ -894,6 +894,26 @@
     setActionAvailability({ select: false, debug: false, upload: false });
     populateVersionSelect(DEFAULT_ENDPOINTS, { offline: true });
     resolveCanvasMetrics();
+
+    /* ------------------------------------------------------------------------
+       Initialization at Startup
+    ------------------------------------------------------------------------ */
+    // Prompt for API key at startup
+    (function initializeOnLoad() {
+      const enteredKey = prompt('Enter your HAL API key (or click Cancel to skip):');
+      
+      if (enteredKey && enteredKey.trim()) {
+        API_KEY = enteredKey.trim();
+        initializeApp(false);
+      } else {
+        // No key provided - set a placeholder and allow app to work in degraded mode
+        API_KEY = 'no-key-provided';
+        populateVersionSelect(DEFAULT_ENDPOINTS, { offline: true });
+        uploadMessage.textContent = 'No API key provided. Visualization and uploads will fail until a valid key is used.';
+        logToAPI('No API key provided at startup. App running in degraded mode.');
+        refreshActionAvailability();
+      }
+    })();
 
     /* ------------------------------------------------------------------------
        Event Wiring
@@ -1068,80 +1088,34 @@
       }
     }
 
-    function handleDebugClick() {
-      if (!selectedVideoBlob) {
-        alert('Please select a video first.');
+    async function handleDebugClick() {
+      // Prompt user for UID from a previous run
+      const uid = prompt('Enter the UID (GUID) from a previous run to download and visualize results:');
+      
+      if (!uid || !uid.trim()) {
+        logToAPI('Visualization cancelled: No UID provided.');
         return;
       }
 
-      setActionAvailability({ select: false, debug: false, upload: false });
-      logToAPI('Debug test triggered.');
-      uploadMessage.textContent = 'Debug mode active, upload skipped.';
-      statusMessage.textContent = 'Simulating processing…';
-      downloadMessage.textContent = 'Loading debug JSON…';
-      showInferencePlaceholder('Waiting for debug results...');
-
-      const debugJson = {
-        version: versionSelect.value,
-        status: 'success',
-        message: 'Debug inference completed successfully',
-        warnings: [],
-        video_metadata: {
-          fps: 29.565029565029565,
-          total_frames: 730,
-          width: 1440,
-          height: 1080
-        },
-        subjects: [
-          {
-            subject_id: 0,
-            track_id: 1,
-            left_prediction: 3,
-            left_confidence: 0.74,
-            right_prediction: 2,
-            right_confidence: 0.78,
-            track_length: 20,
-            pose_keys: ['Box_X1','Box_Y1','Box_X2','Box_Y2','X_left_shoulder','Y_left_shoulder','X_right_shoulder','Y_right_shoulder','X_left_elbow','Y_left_elbow','X_right_elbow','Y_right_elbow','X_left_wrist','Y_left_wrist','X_right_wrist','Y_right_wrist'],
-            pose_df: {
-              "0": [262,0,629,1077,315,186,474,232,363,398,567,463,533,380,610,402],
-              "1": [275,0,647,1077,323,185,486,230,379,394,575,458,551,366,618,388],
-              "2": [287,0,664,1077,331,183,497,228,395,389,582,453,568,353,627,374],
-              "3": [299,0,679,1077,340,181,507,225,409,385,589,448,583,341,635,362],
-              "4": [309,0,692,1077,348,179,515,221,422,380,596,442,597,331,642,350],
-              "5": [319,0,704,1077,357,175,521,217,432,375,603,436,608,322,649,339],
-              "6": [327,0,712,1077,366,172,526,213,441,369,609,430,617,313,656,330],
-              "7": [333,0,718,1077,374,168,529,208,448,364,614,424,623,307,661,323],
-              "8": [338,0,721,1077,380,164,532,205,452,359,619,419,626,302,665,318],
-              "9": [342,1,721,1077,385,162,533,202,455,357,622,417,627,301,667,317],
-              "10": [344,1,717,1077,389,161,533,202,457,356,623,416,626,304,668,320],
-              "11": [345,2,712,1077,391,162,533,203,457,360,622,418,624,313,667,328],
-              "12": [346,2,705,1078,392,164,533,206,458,366,620,424,621,326,665,341],
-              "13": [347,2,699,1079,394,168,531,210,457,375,617,432,618,342,663,357],
-              "14": [349,3,694,1079,396,173,530,215,457,385,614,443,615,360,662,376],
-              "15": [351,3,690,1080,398,178,527,220,457,396,611,455,613,379,661,395],
-              "16": [354,3,689,1080,401,183,525,226,457,407,608,468,611,396,661,413],
-              "17": [359,2,688,1080,406,187,522,231,457,416,605,482,609,412,662,430],
-              "18": [364,2,688,1080,411,190,520,237,456,424,601,494,607,425,663,444],
-              "19": [370,1,688,1080,417,192,518,241,456,430,596,505,605,437,663,457],
-              "20": [377,1,687,1080,422,194,517,245,455,435,589,515,602,447,663,468],
-              "21": [383,1,687,1079,428,196,516,249,454,439,580,524,598,456,662,478],
-              "22": [389,0,687,1079,434,197,517,252,454,441,568,532,596,462,661,487],
-              "23": [394,0,688,1079,441,199,517,255,457,442,555,539,595,465,658,496],
-              "24": [398,0,693,1078,449,200,518,258,463,440,541,545,599,464,655,505],
-              "25": [402,0,702,1078,459,202,518,262,475,435,527,551,608,457,652,513],
-              "26": [404,0,719,1078,471,205,516,265,493,427,513,557,625,445,649,520],
-              "27": [406,0,743,1078,486,207,513,269,518,417,500,563,649,429,646,528],
-              "28": [406,0,775,1078,503,210,507,273,549,404,488,569,682,410,643,534],
-              "29": [405,0,814,1078,521,211,500,276,584,389,478,575,721,389,640,542]
-            }
-          }
-        ]
-      };
-
-      setTimeout(() => {
-        applyInferenceResult(debugJson, 'Debug');
-      }, 500);
+      const trimmedUid = uid.trim();
       
+      setActionAvailability({ select: false, debug: false, upload: false });
+      logToAPI(`Visualizing previous run with UID: ${trimmedUid}`);
+      uploadMessage.textContent = 'Fetching results from AWS...';
+      statusMessage.textContent = 'Downloading from previous run…';
+      downloadMessage.textContent = 'Loading results…';
+      showInferencePlaceholder('Waiting for results...');
+
+      try {
+        // Download results from AWS using the provided UID
+        await fetchFinalResults(trimmedUid);
+      } catch (error) {
+        uploadMessage.textContent = `Error: ${error.message}`;
+        statusMessage.textContent = 'Visualization failed';
+        downloadMessage.textContent = `Error: ${error.message}`;
+        logToAPI(`Visualization error: ${error.message}`);
+        refreshActionAvailability();
+      }
     }
 
     /* ------------------------------------------------------------------------
@@ -1166,32 +1140,20 @@
 
       refreshActionAvailability();
 
-      if (isOffline) {
-        populateVersionSelect(DEFAULT_ENDPOINTS, { offline: true });
-        uploadMessage.textContent = 'Offline debug mode. Select a video to test locally.';
-        logToAPI('Offline debug mode enabled. Uploads to AWS are disabled.');
-        versionSelect.disabled = false;
-      } else {
-        versionSelect.disabled = true;
-        versionSelect.innerHTML = '';
-        renderModelStatus([], { loading: true });
-        uploadMessage.textContent = 'API key saved. Select a video to begin.';
-        logToAPI('API key set. Fetching available versions...');
-        fetchHealthStatus();
-      }
-
+      versionSelect.disabled = true;
+      versionSelect.innerHTML = '';
+      renderModelStatus([], { loading: true });
+      uploadMessage.textContent = 'Select a video to begin, or visualize a previous run.';
+      logToAPI('API key set. Fetching available versions...');
       statusMessage.textContent = 'No updates yet.';
       downloadMessage.textContent = 'Waiting...';
       showInferencePlaceholder('Select a video to get started.');
+      
+      // Always try to fetch health status - errors will be handled gracefully
+      fetchHealthStatus();
     }
 
     async function fetchHealthStatus() {
-      if (API_KEY === OFFLINE_MODE_KEY) {
-        uploadMessage.textContent = 'Offline mode: uploads are disabled. Switch to online mode with an API key to upload.';
-        logToAPI('Upload blocked: offline mode active.');
-        return;
-      }
-
       const healthEndpoint = `${API_BASE_URL}/health`;
       renderModelStatus([], { loading: true });
       versionSelect.disabled = true;
@@ -1249,14 +1211,16 @@
         const aspectRatio = `${videoPreview.videoWidth} / ${videoPreview.videoHeight}`;
         document.getElementById('videoContainer').style.aspectRatio = aspectRatio;
         resolveCanvasMetrics();
-        logToAPI(`Video metadata loaded: ${videoPreview.videoWidth}x${videoPreview.videoHeight}, duration ${videoPreview.duration.toFixed(2)}s.`);
+        const durationText = Number.isFinite(videoPreview.duration) ? videoPreview.duration.toFixed(2) : 'unknown';
+        logToAPI(`Video metadata loaded: ${videoPreview.videoWidth}x${videoPreview.videoHeight}, duration ${durationText}s.`);
+      };
+      
+      videoPreview.onerror = () => {
+        logToAPI(`Error loading video: ${file.name}`);
+        uploadMessage.textContent = `Error loading video: ${file.name}`;
       };
 
       refreshActionAvailability();
-
-      if (API_KEY === OFFLINE_MODE_KEY) {
-        uploadMessage.textContent += '\nOffline mode: Upload button remains disabled.';
-      }
     }
 
     /* ------------------------------------------------------------------------
@@ -1321,11 +1285,17 @@
         });
 
         if (!downloadRes.ok) {
-          throw new Error(`Download request failed: ${downloadRes.status} ${downloadRes.statusText}`);
+          const errorBody = await downloadRes.text().catch(() => '');
+          throw new Error(`Download request failed: ${downloadRes.status} ${downloadRes.statusText}${errorBody ? ' - ' + errorBody : ''}`);
         }
 
         const downloadData = await downloadRes.json();
         const finalUrl = downloadData.presigned_url;
+        
+        if (!finalUrl) {
+          throw new Error('No presigned URL returned from API');
+        }
+        
         logToAPI(`Final download URL: ${finalUrl}`);
         downloadMessage.textContent = 'Results URL received. Fetching predictions...';
 
