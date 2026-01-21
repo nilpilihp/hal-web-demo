@@ -16,6 +16,20 @@ export interface Subject {
   track_length: number;
   pose_keys: string[];
   pose_df: Record<string, number[]>;
+  left_metrics?: {
+    hal_score: number;
+    duty_cycle: number;
+    frequency_hz: number;
+    n_reps: number;
+    dominant_freq: number;
+  };
+  right_metrics?: {
+    hal_score: number;
+    duty_cycle: number;
+    frequency_hz: number;
+    n_reps: number;
+    dominant_freq: number;
+  };
 }
 
 export interface InferenceResult {

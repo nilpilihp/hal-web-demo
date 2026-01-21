@@ -513,7 +513,7 @@ const App: React.FC = () => {
                       ? 'text-red-400'
                       : 'text-emerald-400'
                   }
-                  subtitle={`Confidence: ${((subject.right_confidence || 0) * 100).toFixed(0)}%`}
+                  subtitle={`Confidence: ${((subject.right_confidence || 0) * 100).toFixed(0)}% | ${subject.right_metrics?.n_reps ?? 0} reps | DC: ${(subject.right_metrics?.duty_cycle ?? 0).toFixed(1)} | Freq: ${(subject.right_metrics?.frequency_hz ?? 0).toFixed(1)} Hz`}
                   trend={
                     typeof subject.right_prediction === 'number' && subject.right_prediction > 6.5
                       ? 'EXCEEDS TLV'
@@ -528,7 +528,7 @@ const App: React.FC = () => {
                       ? 'text-red-400'
                       : 'text-blue-400'
                   }
-                  subtitle={`Confidence: ${((subject.left_confidence || 0) * 100).toFixed(0)}%`}
+                  subtitle={`Confidence: ${((subject.left_confidence || 0) * 100).toFixed(0)}% | ${subject.left_metrics?.n_reps ?? 0} reps | DC: ${(subject.left_metrics?.duty_cycle ?? 0).toFixed(1)} | Freq: ${(subject.left_metrics?.frequency_hz ?? 0).toFixed(1)} Hz`}
                   trend={
                     typeof subject.left_prediction === 'number' && subject.left_prediction > 6.5
                       ? 'EXCEEDS TLV'
