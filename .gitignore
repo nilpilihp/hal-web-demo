@@ -1,1 +1,27 @@
-.vscode/settings.json
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Dependency directories (THE IMPORTANT PART)
+node_modules/
+
+# Build output
+dist/
+dist-ssr/
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs
+*.njsproj
+*.sln
+*.sw?
+
+# Environment variables (Security)
+.env
+.env.local
+.env.*.local
