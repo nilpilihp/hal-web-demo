@@ -33,6 +33,7 @@ const App: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const apiService = useRef<HALAPIService | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
 
   const addLog = (message: string) => {
     const timestamp = new Date().toLocaleTimeString();
@@ -216,9 +217,55 @@ const App: React.FC = () => {
   const handleTimeUpdate = () => {
     if (videoRef.current) {
       setCurrentTime(videoRef.current.currentTime);
-      drawKeypoints();
     }
   };
+
+  const renderLoop = () => {
+    if (videoRef.current && !videoRef.current.paused && !videoRef.current.ended) {
+      drawKeypoints();
+      animationFrameRef.current = requestAnimationFrame(renderLoop);
+    }
+  };
+
+  const startRenderLoop = () => {
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+    renderLoop();
+  };
+
+  const stopRenderLoop = () => {
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+  };
+
+  // Setup video event listeners for render loop
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const handlePlay = () => startRenderLoop();
+    const handlePause = () => stopRenderLoop();
+    const handleSeeked = () => {
+      drawKeypoints();
+      if (!video.paused) {
+        startRenderLoop();
+      }
+    };
+
+    video.addEventListener('play', handlePlay);
+    video.addEventListener('pause', handlePause);
+    video.addEventListener('seeked', handleSeeked);
+
+    return () => {
+      video.removeEventListener('play', handlePlay);
+      video.removeEventListener('pause', handlePause);
+      video.removeEventListener('seeked', handleSeeked);
+      stopRenderLoop();
+    };
+  }, [poseData, poseKeys, inferenceResult]);
 
   const drawKeypoints = () => {
     if (!videoRef.current || !canvasRef.current || !poseKeys.length || Object.keys(poseData).length === 0) {
